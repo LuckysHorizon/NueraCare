@@ -1,8 +1,8 @@
 PRODUCT TECH STACK DOCUMENTATION
-ArogyaPulse – Intelligent Healthcare & Accessibility App
+NueraCare – Intelligent Healthcare & Accessibility App
 1️⃣ Document Purpose
 
-This document describes the complete technical stack used to build ArogyaPulse, a mobile healthcare application focused on:
+This document describes the complete technical stack used to build NueraCare, a mobile healthcare application focused on:
 
 Medical report understanding
 
@@ -221,7 +221,7 @@ Chatbot responses
 
 6.3 AI Safety Strategy (CRITICAL)
 
-ArogyaPulse uses a Hybrid AI Approach:
+NueraCare uses a Hybrid AI Approach:
 
 Rule-Based Medical Logic (Deterministic)
                 +
@@ -397,5 +397,5 @@ Diagnosis or prescriptions
 
 15️⃣ Final Technical Justification
 
-ArogyaPulse uses a modern, healthcare-safe, AI-driven tech stack that balances speed, scalability, accessibility, and ethics.
+NueraCare uses a modern, healthcare-safe, AI-driven tech stack that balances speed, scalability, accessibility, and ethics.
 Each technology was chosen to maximize real-world impact within hackathon constraints, while remaining production-ready.

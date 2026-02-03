@@ -1,8 +1,8 @@
 Product Design Document (PDD)
-ArogyaPulse — Intelligent Healthcare Companion App
+NueraCare — Intelligent Healthcare Companion App
 🧭 1. Design Vision & Philosophy
 
-ArogyaPulse blends modern, minimal, health-focused UI design with clarity, accessibility, and empathy, taking inspiration from MyWisdom – Healthcare App for Home Care’s calm and readable layout.
+NueraCare blends modern, minimal, health-focused UI design with clarity, accessibility, and empathy, taking inspiration from MyWisdom – Healthcare App for Home Care’s calm and readable layout.
 
 Key UI Objectives:
 
@@ -274,7 +274,7 @@ Visual cues & illustrations
 
 Tooltips for first-time users
 
-🎯 13. UI/UX Goals for ArogyaPulse
+🎯 13. UI/UX Goals for NueraCare
 Goal	Why
 Calm & Reassuring	Health anxiety is real
 Actionable Next Steps	Users should do, not just read

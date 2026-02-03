@@ -1,10 +1,10 @@
-AROGYAPULSE – COMPLETE FILE STRUCTURE
+NUERACARE – COMPLETE FILE STRUCTURE
 🟢 1️⃣ FRONTEND (React Native + Expo)
 
 Owner: Mobile UI & Accessibility Team Member
 Rule: UI + UX only (NO business logic)
 
-arogyapulse-app/
+nueracare-app/
 │
 ├── app/                         ← Expo Router
 │   ├── _layout.tsx              ← Root layout
@@ -135,6 +135,17 @@ backend/services/
 ├── report_parser.py             ← Extract values
 ├── hospital_ranker.py           ← Sort & filter hospitals
 
+🔹 Report-Based Chatbot Module (Dedicated Ownership)
+backend/chatbot/
+│
+├── router.py                     ← /chat endpoints (FastAPI)
+├── service.py                    ← Core chat orchestration
+├── schemas.py                    ← Pydantic request/response
+├── prompts.py                    ← Safe prompt templates
+├── dependencies.py               ← Auth + report context
+└── tests/
+	└── test_chatbot.py           ← Unit tests
+
 🔹 Voice & IVR Logic
 backend/voice/
 │
@@ -197,5 +208,20 @@ Voice & Notifications	/backend/voice, /backend/notifications
 ✔ Clean architecture
 
 ✔ Looks production-ready
+
+🟢 5️⃣ Backend Deployment Cleanliness (One‑Click Ready)
+
+Required Files
+- backend/requirements.txt (pinned versions)
+- backend/.env.example (document all env keys)
+- backend/main.py exposes app = FastAPI()
+
+Render/Railway/Fly.io Start Command
+- uvicorn main:app --host 0.0.0.0 --port $PORT
+
+Rules
+- Stateless backend (no local file storage)
+- External services via env vars
+- Health endpoint: /health
 
 Judges will notice this maturity.

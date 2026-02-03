@@ -1,5 +1,5 @@
 PRODUCT ARCHITECTURE DOCUMENT
-ArogyaPulse – Hackathon Architecture (Team of 4)
+NueraCare – Hackathon Architecture (Team of 4)
 1️⃣ Architecture Goals (Hackathon-First)
 
 This architecture is designed to:

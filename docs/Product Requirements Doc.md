@@ -1,6 +1,6 @@
 PRODUCT REQUIREMENTS DOCUMENT (PRD)
 App Name
-ArogyaPulse
+NueraCare
 
 “A gentle, intelligent healthcare companion that understands, explains, and follows up.”
 
@@ -45,7 +45,7 @@ Elderly users struggle with apps
 
 Healthcare apps focus on data, not people
 
-✅ ArogyaPulse Solves This By:
+✅ NueraCare Solves This By:
 
 Explaining reports softly & clearly
 
@@ -57,7 +57,7 @@ Supporting accessibility by default
 
 3️⃣ Key Value Proposition
 
-“ArogyaPulse doesn’t just show health data —
+“NueraCare doesn’t just show health data —
 it understands, explains, and checks back on the patient.”
 
 4️⃣ Core Features (Detailed)
@@ -180,7 +180,7 @@ Automated phone calls to check task completion.
 
 Example Flow
 
-“Hello, this is ArogyaPulse.
+“Hello, this is NueraCare.
 Did you complete today’s exercise?
 Press 1 for Yes, Press 2 for No.”
 
@@ -360,7 +360,7 @@ Judge understanding in <2 minutes
 
 🔚 Final Product Vision
 
-ArogyaPulse is not just a healthcare app.
+NueraCare is not just a healthcare app.
 It is a patient companion that:
 
 Understands medical data
