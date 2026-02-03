@@ -268,16 +268,26 @@ export default function ProfileScreen() {
         </GlassCard>
 
         <TouchableOpacity
-          style={styles.logoutCardButton}
+          style={styles.logoutButton}
           onPress={handleLogout}
-          activeOpacity={0.7}
+          activeOpacity={0.85}
         >
-          <GlassCard style={styles.logoutCard}>
+          <LinearGradient
+            colors={["#F87171", "#EF4444"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.logoutGradient}
+          >
             <View style={styles.logoutContent}>
-              <LogOut size={20} color="#E15555" />
-              <Text style={styles.logoutText}>Log Out</Text>
+              <View style={styles.logoutIconWrap}>
+                <LogOut size={18} color="#FFFFFF" />
+              </View>
+              <View>
+                <Text style={styles.logoutText}>Log out</Text>
+                <Text style={styles.logoutSubtext}>Sign out from your account</Text>
+              </View>
             </View>
-          </GlassCard>
+          </LinearGradient>
         </TouchableOpacity>
       </ScrollView>
     </LinearGradient>
@@ -529,24 +539,45 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 8,
   },
-  logoutCardButton: {
+  logoutButton: {
     marginTop: 8,
+    borderRadius: 18,
+    overflow: "hidden",
+    shadowColor: "#EF4444",
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 6,
   },
-  logoutCard: {
-    alignItems: "center",
-    backgroundColor: "rgba(240, 90, 90, 0.1)",
-    borderColor: "rgba(240, 90, 90, 0.2)",
-    borderWidth: 1,
+  logoutGradient: {
+    paddingHorizontal: 16,
+    paddingVertical: 14,
   },
   logoutContent: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    gap: 12,
+  },
+  logoutIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255, 255, 255, 0.22)",
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.25)",
   },
   logoutText: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: "700",
-    color: "#E15555",
+    color: "#FFFFFF",
+    fontFamily: "Inter",
+  },
+  logoutSubtext: {
+    marginTop: 2,
+    fontSize: 11,
+    color: "rgba(255, 255, 255, 0.85)",
     fontFamily: "Inter",
   },
 });
