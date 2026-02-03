@@ -3,8 +3,10 @@
   "compilerOptions": {
     "strict": true,
     "baseUrl": ".",
+    "types": ["react", "react-native"],
     "paths": {
       "@/*": ["./*"]
     }
-  }
+  },
+  "exclude": ["node_modules"]
 }

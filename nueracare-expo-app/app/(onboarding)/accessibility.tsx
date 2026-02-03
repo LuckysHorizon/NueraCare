@@ -1,141 +1,265 @@
 import React, { useState } from "react";
-import { View, ScrollView, StyleSheet, Switch } from "react-native";
+import { View, ScrollView, StyleSheet, Switch, Platform, Text } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
+import { BlurView } from "expo-blur";
 import { useRouter } from "expo-router";
+import { useUser } from "@clerk/clerk-expo";
 import { Button, Heading, Body } from "@/components/common";
-import { colors, spacing, borderRadius } from "@/theme/colors";
-import { globalStyles } from "@/theme/styles";
+import { spacing } from "@/theme/colors";
+import { updateUserProfile } from "@/services/sanity";
+import {
+  Volume2,
+  Eye,
+  Wind,
+  Shield,
+} from "lucide-react-native";
+
+const ACCENT = "#00BFA5";
 
 export default function AccessibilityScreen() {
   const router = useRouter();
+  const { user } = useUser();
+  const [loading, setLoading] = useState(false);
   const [preferences, setPreferences] = useState({
-    largeText: false,
+    largeText: true,
     highContrast: false,
     reduceMotion: false,
     voiceMode: false,
   });
 
-  const handleNext = () => {
-    // Save preferences
-    router.push("/(onboarding)/permissions");
+  const handleNext = async () => {
+    if (!user?.id) {
+      router.push("/(onboarding)/permissions");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      // Save accessibility preferences to Sanity
+      await updateUserProfile(user.id, {
+        largeTextMode: preferences.largeText,
+        highContrast: preferences.highContrast,
+        reducedMotion: preferences.reduceMotion,
+      });
+      router.push("/(onboarding)/permissions");
+    } catch (error) {
+      console.error("Error saving accessibility preferences:", error);
+      router.push("/(onboarding)/permissions");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      <View style={styles.header}>
-        <Heading level={2}>Accessibility Preferences</Heading>
-        <Body style={styles.subtitle}>
-          Customize the app for your comfort
-        </Body>
-      </View>
+    <LinearGradient
+      colors={["#EAFBF8", "#F7FEFD", "#FFFFFF"]}
+      style={styles.container}
+    >
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
+        <View style={styles.header}>
+          <Heading level={2} style={styles.title}>Accessibility Preferences</Heading>
+          <Body style={styles.subtitle}>
+            Customize the app for your comfort
+          </Body>
+        </View>
 
-      <View style={styles.preferences}>
-        <PreferenceToggle
-          title="Large Text"
-          description="Increase font size for easier reading"
-          value={preferences.largeText}
-          onChange={(largeText: boolean) =>
-            setPreferences({ ...preferences, largeText })
-          }
-        />
+        <View style={styles.preferences}>
+          <PreferenceToggle
+            icon={<Eye size={20} color={ACCENT} />}
+            title="Large Text"
+            description="Increase font size for easier reading"
+            value={preferences.largeText}
+            onChange={(largeText) =>
+              setPreferences({ ...preferences, largeText })
+            }
+          />
 
-        <PreferenceToggle
-          title="High Contrast"
-          description="Bold colors for better visibility"
-          value={preferences.highContrast}
-          onChange={(highContrast: boolean) =>
-            setPreferences({ ...preferences, highContrast })
-          }
-        />
+          <PreferenceToggle
+            icon={<Shield size={20} color={ACCENT} />}
+            title="High Contrast"
+            description="Bold colors for better visibility"
+            value={preferences.highContrast}
+            onChange={(highContrast) =>
+              setPreferences({ ...preferences, highContrast })
+            }
+          />
 
-        <PreferenceToggle
-          title="Reduce Motion"
-          description="Minimize animations and transitions"
-          value={preferences.reduceMotion}
-          onChange={(reduceMotion: boolean) =>
-            setPreferences({ ...preferences, reduceMotion })
-          }
-        />
+          <PreferenceToggle
+            icon={<Wind size={20} color={ACCENT} />}
+            title="Reduce Motion"
+            description="Minimize animations and transitions"
+            value={preferences.reduceMotion}
+            onChange={(reduceMotion) =>
+              setPreferences({ ...preferences, reduceMotion })
+            }
+          />
 
-        <PreferenceToggle
-          title="Voice Mode"
-          description="Primarily use voice navigation"
-          value={preferences.voiceMode}
-          onChange={(voiceMode: boolean) =>
-            setPreferences({ ...preferences, voiceMode })
-          }
-        />
-      </View>
+          <PreferenceToggle
+            icon={<Volume2 size={20} color={ACCENT} />}
+            title="Voice Mode"
+            description="Primarily use voice navigation"
+            value={preferences.voiceMode}
+            onChange={(voiceMode) =>
+              setPreferences({ ...preferences, voiceMode })
+            }
+          />
+        </View>
+
+        <View style={styles.infoBox}>
+          <Text style={styles.infoTitle}>💡 Tip</Text>
+          <Text style={styles.infoText}>
+            You can change these settings anytime in your profile.
+          </Text>
+        </View>
+      </ScrollView>
 
       <View style={styles.footer}>
-        <Button title="Continue" onPress={handleNext} />
+        <Button
+          title={loading ? "Saving..." : "Continue"}
+          onPress={handleNext}
+        />
       </View>
-    </ScrollView>
+    </LinearGradient>
   );
 }
 
 function PreferenceToggle({
+  icon,
   title,
   description,
   value,
   onChange,
 }: {
+  icon: React.ReactNode;
   title: string;
   description: string;
   value: boolean;
   onChange: (value: boolean) => void;
 }) {
   return (
-    <View style={styles.toggleItem}>
-      <View style={styles.toggleContent}>
-        <Heading level={4}>{title}</Heading>
-        <Body style={styles.toggleDescription}>{description}</Body>
-      </View>
-      <Switch
-        value={value}
-        onValueChange={onChange}
-        trackColor={{ false: colors.gray200, true: colors.primary200 }}
-        thumbColor={value ? colors.primary : colors.gray400}
-      />
+    <View style={styles.preferenceItem}>
+      <BlurView intensity={50} tint="light" style={styles.preferenceBlur}>
+        <View style={styles.preferenceContent}>
+          <View style={styles.preferenceLeft}>
+            <View style={styles.iconBox}>{icon}</View>
+            <View style={styles.textBox}>
+              <Heading level={4} style={styles.preferenceTitle}>{title}</Heading>
+              <Body style={styles.preferenceDescription}>{description}</Body>
+            </View>
+          </View>
+          <Switch
+            value={value}
+            onValueChange={onChange}
+            trackColor={{ false: "#D1D5DB", true: "#BFF3EC" }}
+            thumbColor={value ? ACCENT : "#FFFFFF"}
+          />
+        </View>
+      </BlurView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    ...globalStyles.container,
+    flex: 1,
+  },
+  content: {
     paddingHorizontal: spacing.lg,
-    paddingTop: spacing.xxl,
+    paddingVertical: spacing.lg,
+    paddingTop: Platform.OS === "ios" ? spacing.xxl : spacing.xl,
   },
   header: {
     marginBottom: spacing.xl,
   },
+  title: {
+    fontSize: 24,
+    fontWeight: "700",
+    color: "#0F172A",
+    fontFamily: "Inter",
+  },
   subtitle: {
-    color: colors.textLight,
+    color: "#6B7280",
     marginTop: spacing.md,
     fontSize: 14,
+    fontFamily: "Inter",
   },
   preferences: {
+    gap: spacing.lg,
     marginBottom: spacing.xl,
-    gap: spacing.md,
   },
-  toggleItem: {
-    backgroundColor: colors.gray50,
-    borderRadius: borderRadius.lg,
-    padding: spacing.lg,
+  preferenceItem: {
+    borderRadius: 20,
+    overflow: "hidden",
+    backgroundColor: "rgba(255, 255, 255, 0.8)",
+    shadowColor: "#0F172A",
+    shadowOpacity: 0.05,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 4,
+  },
+  preferenceBlur: {
+    borderRadius: 20,
+  },
+  preferenceContent: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    padding: spacing.lg,
+    backgroundColor: "rgba(255, 255, 255, 0.6)",
   },
-  toggleContent: {
+  preferenceLeft: {
     flex: 1,
-    marginRight: spacing.lg,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: spacing.md,
   },
-  toggleDescription: {
-    color: colors.textLight,
-    marginTop: spacing.sm,
-    fontSize: 12,
+  iconBox: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: "rgba(0, 191, 165, 0.1)",
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 2,
+  },
+  textBox: {
+    flex: 1,
+  },
+  preferenceTitle: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#0F172A",
+    fontFamily: "Inter",
+  },
+  preferenceDescription: {
+    color: "#6B7280",
+    marginTop: spacing.xs,
+    fontSize: 13,
+    fontFamily: "Inter",
+  },
+  infoBox: {
+    borderRadius: 16,
+    padding: spacing.lg,
+    backgroundColor: "rgba(0, 191, 165, 0.08)",
+    borderWidth: 1,
+    borderColor: "rgba(0, 191, 165, 0.2)",
+    marginBottom: spacing.xl,
+  },
+  infoTitle: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#0F172A",
+    fontFamily: "Inter",
+    marginBottom: spacing.xs,
+  },
+  infoText: {
+    fontSize: 13,
+    color: "#4B5563",
+    fontFamily: "Inter",
+    lineHeight: 18,
   },
   footer: {
-    paddingVertical: spacing.xl,
+    padding: spacing.lg,
+    paddingBottom: Platform.OS === "ios" ? spacing.xl : spacing.lg,
   },
 });

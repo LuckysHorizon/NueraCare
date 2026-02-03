@@ -10,10 +10,15 @@
     "web": "expo start --web",
     "prebuild": "expo prebuild",
     "run:android": "expo run:android",
-    "run:ios": "expo run:ios"
+    "run:ios": "expo run:ios",
+    "sanity:deploy": "sanity schema deploy",
+    "sanity:typegen": "sanity typegen generate",
+    "sanity:studio": "sanity studio",
+    "sanity:dataset:create": "sanity dataset create production"
   },
   "dependencies": {
     "@clerk/clerk-expo": "^2.19.21",
+    "@sanity/client": "^7.14.1",
     "expo": "~54.0.33",
     "expo-auth-session": "^7.0.10",
     "expo-blur": "~15.0.8",
@@ -29,12 +34,20 @@
     "react-native": "0.81.5",
     "react-native-safe-area-context": "^5.6.2",
     "react-native-screens": "~4.16.0",
-    "react-native-svg": "^15.15.1"
+    "react-native-svg": "^15.15.1",
+    "sanity": "^3.99.0",
+    "styled-components": "^6.3.8"
   },
   "devDependencies": {
+    "@sanity/structure": "^2.36.2",
+    "@sanity/vision": "^3.99.0",
     "@types/react": "~19.1.0",
+    "@types/react-is": "^19.0.0",
     "@types/react-native": "^0.72.8",
+    "@types/use-sync-external-store": "^0.0.3",
+    "@types/which": "^3.0.4",
     "babel-preset-expo": "^54.0.10",
+    "expo-module-scripts": "^5.0.8",
     "typescript": "~5.9.2"
   },
   "private": true

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import {
   Image,
   Platform,
@@ -7,10 +7,13 @@ import {
   Switch,
   Text,
   View,
+  TouchableOpacity,
+  ActivityIndicator,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { BlurView } from "expo-blur";
-import { useUser } from "@clerk/clerk-expo";
+import { useUser, useClerk } from "@clerk/clerk-expo";
+import { useRouter } from "expo-router";
 import {
   AlertTriangle,
   BadgeCheck,
@@ -20,13 +23,15 @@ import {
   Ruler,
   ShieldCheck,
   UserRound,
+  LogOut,
 } from "lucide-react-native";
+import { getUserProfile, updateUserProfile, UserHealthProfile } from "@/services/sanity";
 
 const ACCENT = "#00BFA5";
 
 function GlassCard({ children, style }: { children: React.ReactNode; style?: any }) {
   return (
-    <View style={[styles.glassCard, style]}> 
+    <View style={[styles.glassCard, style]}>
       <BlurView intensity={60} tint="light" style={styles.blurContainer}>
         <View style={styles.glassContent}>{children}</View>
       </BlurView>
@@ -45,17 +50,82 @@ function getInitials(name: string) {
 
 export default function ProfileScreen() {
   const { user } = useUser();
+  const { signOut } = useClerk();
+  const router = useRouter();
+  const [loading, setLoading] = useState(true);
+  const [profile, setProfile] = useState<UserHealthProfile | null>(null);
   const [highContrast, setHighContrast] = useState(false);
   const [largeText, setLargeText] = useState(true);
 
+  useEffect(() => {
+    loadUserProfile();
+  }, [user?.id]);
+
+  const loadUserProfile = async () => {
+    if (!user?.id) return;
+    try {
+      setLoading(true);
+      const data = await getUserProfile(user.id);
+      if (data) {
+        setProfile(data);
+        setHighContrast(data.highContrast || false);
+        setLargeText(data.largeTextMode || true);
+      }
+    } catch (error) {
+      console.error("Error loading profile:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleHighContrastToggle = async (value: boolean) => {
+    setHighContrast(value);
+    if (user?.id && profile) {
+      try {
+        await updateUserProfile(user.id, { highContrast: value });
+      } catch (error) {
+        console.error("Error updating profile:", error);
+      }
+    }
+  };
+
+  const handleLargeTextToggle = async (value: boolean) => {
+    setLargeText(value);
+    if (user?.id && profile) {
+      try {
+        await updateUserProfile(user.id, { largeTextMode: value });
+      } catch (error) {
+        console.error("Error updating profile:", error);
+      }
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await signOut();
+      router.replace("/(auth)/login");
+    } catch (error) {
+      console.error("Error signing out:", error);
+      alert("Failed to sign out");
+    }
+  };
+
   const displayName = useMemo(() => {
-    return user?.firstName || user?.fullName || "User";
-  }, [user?.firstName, user?.fullName]);
+    return profile?.firstName || user?.firstName || "User";
+  }, [profile?.firstName, user?.firstName]);
 
   const verifiedId = useMemo(() => {
     if (!user?.id) return "Verified Health ID";
     return `Verified Health ID: ${user.id.slice(0, 8).toUpperCase()}`;
   }, [user?.id]);
+
+  if (loading) {
+    return (
+      <View style={styles.centerContainer}>
+        <ActivityIndicator size="large" color={ACCENT} />
+      </View>
+    );
+  }
 
   return (
     <LinearGradient
@@ -113,45 +183,61 @@ export default function ProfileScreen() {
           </View>
         </LinearGradient>
 
-        <GlassCard>
-          <Text style={styles.sectionTitle}>Health Identity</Text>
-          <View style={styles.grid}>
-            <View style={styles.gridTile}>
-              <HeartPulse size={16} color={ACCENT} />
-              <Text style={styles.gridLabel}>Blood Group</Text>
-              <Text style={styles.gridValue}>A+</Text>
-            </View>
-            <View style={styles.gridTile}>
-              <UserRound size={16} color={ACCENT} />
-              <Text style={styles.gridLabel}>Age</Text>
-              <Text style={styles.gridValue}>28</Text>
-            </View>
-            <View style={styles.gridTile}>
-              <Ruler size={16} color={ACCENT} />
-              <Text style={styles.gridLabel}>Height</Text>
-              <Text style={styles.gridValue}>165 cm</Text>
-            </View>
-            <View style={styles.gridTile}>
-              <Languages size={16} color={ACCENT} />
-              <Text style={styles.gridLabel}>Primary Language</Text>
-              <Text style={styles.gridValue}>Hindi</Text>
-            </View>
-          </View>
-        </GlassCard>
+        {profile && (
+          <>
+            <GlassCard>
+              <Text style={styles.sectionTitle}>Health Identity</Text>
+              <View style={styles.grid}>
+                <View style={styles.gridTile}>
+                  <HeartPulse size={16} color={ACCENT} />
+                  <Text style={styles.gridLabel}>Blood Group</Text>
+                  <Text style={styles.gridValue}>{profile.bloodGroup || "—"}</Text>
+                </View>
+                <View style={styles.gridTile}>
+                  <UserRound size={16} color={ACCENT} />
+                  <Text style={styles.gridLabel}>Age</Text>
+                  <Text style={styles.gridValue}>{profile.age || "—"}</Text>
+                </View>
+                <View style={styles.gridTile}>
+                  <Ruler size={16} color={ACCENT} />
+                  <Text style={styles.gridLabel}>Height</Text>
+                  <Text style={styles.gridValue}>{profile.height ? `${profile.height} cm` : "—"}</Text>
+                </View>
+                <View style={styles.gridTile}>
+                  <HeartPulse size={16} color={ACCENT} />
+                  <Text style={styles.gridLabel}>Weight</Text>
+                  <Text style={styles.gridValue}>{profile.weight ? `${profile.weight} kg` : "—"}</Text>
+                </View>
+              </View>
+              {profile.chronicDiseases && (
+                <View style={styles.chronicSection}>
+                  <Text style={styles.chronicLabel}>Chronic Conditions</Text>
+                  <Text style={styles.chronicValue}>{profile.chronicDiseases}</Text>
+                </View>
+              )}
+            </GlassCard>
 
-        <GlassCard>
-          <Text style={styles.sectionTitle}>Caregiver Connectivity</Text>
-          <View style={styles.rowBetween}>
-            <Text style={styles.bodyText}>Linked Caregiver</Text>
-            <Text style={styles.bodyValue}>Anand Sharma</Text>
-          </View>
-          <View style={styles.rowBetween}>
-            <Text style={styles.caption}>Alert on Missed</Text>
-            <View style={styles.badgeActive}>
-              <Text style={styles.badgeText}>Active</Text>
-            </View>
-          </View>
-        </GlassCard>
+            <GlassCard>
+              <Text style={styles.sectionTitle}>Caregiver Connectivity</Text>
+              <View style={styles.rowBetween}>
+                <Text style={styles.bodyText}>Linked Caregiver</Text>
+                <Text style={styles.bodyValue}>{profile.caregiverName || "Not set"}</Text>
+              </View>
+              {profile.caregiverPhone && (
+                <View style={styles.rowBetween}>
+                  <Text style={styles.caption}>Contact</Text>
+                  <Text style={styles.bodyValue}>{profile.caregiverPhone}</Text>
+                </View>
+              )}
+              <View style={styles.rowBetween}>
+                <Text style={styles.caption}>Alert on Missed</Text>
+                <View style={styles.badgeActive}>
+                  <Text style={styles.badgeText}>Active</Text>
+                </View>
+              </View>
+            </GlassCard>
+          </>
+        )}
 
         <GlassCard>
           <Text style={styles.sectionTitle}>Accessibility Suite</Text>
@@ -162,7 +248,7 @@ export default function ProfileScreen() {
             </View>
             <Switch
               value={highContrast}
-              onValueChange={setHighContrast}
+              onValueChange={handleHighContrastToggle}
               trackColor={{ false: "#D1D5DB", true: "#BFF3EC" }}
               thumbColor={highContrast ? ACCENT : "#FFFFFF"}
             />
@@ -174,16 +260,25 @@ export default function ProfileScreen() {
             </View>
             <Switch
               value={largeText}
-              onValueChange={setLargeText}
+              onValueChange={handleLargeTextToggle}
               trackColor={{ false: "#D1D5DB", true: "#BFF3EC" }}
               thumbColor={largeText ? ACCENT : "#FFFFFF"}
             />
           </View>
         </GlassCard>
 
-        <GlassCard style={styles.logoutCard}>
-          <Text style={styles.logoutText}>Log Out</Text>
-        </GlassCard>
+        <TouchableOpacity
+          style={styles.logoutCardButton}
+          onPress={handleLogout}
+          activeOpacity={0.7}
+        >
+          <GlassCard style={styles.logoutCard}>
+            <View style={styles.logoutContent}>
+              <LogOut size={20} color="#E15555" />
+              <Text style={styles.logoutText}>Log Out</Text>
+            </View>
+          </GlassCard>
+        </TouchableOpacity>
       </ScrollView>
     </LinearGradient>
   );
@@ -192,6 +287,11 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  centerContainer: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
   },
   content: {
     padding: 20,
@@ -353,6 +453,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#E5F7F4",
     gap: 6,
+    alignItems: "center",
   },
   gridLabel: {
     fontSize: 11,
@@ -363,6 +464,24 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "700",
     color: "#0F172A",
+    fontFamily: "Inter",
+  },
+  chronicSection: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: "#E5E7EB",
+  },
+  chronicLabel: {
+    fontSize: 12,
+    color: "#6B7280",
+    fontFamily: "Inter",
+  },
+  chronicValue: {
+    fontSize: 13,
+    color: "#0F172A",
+    fontWeight: "500",
+    marginTop: 4,
     fontFamily: "Inter",
   },
   rowBetween: {
@@ -410,11 +529,19 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 8,
   },
+  logoutCardButton: {
+    marginTop: 8,
+  },
   logoutCard: {
     alignItems: "center",
     backgroundColor: "rgba(240, 90, 90, 0.1)",
     borderColor: "rgba(240, 90, 90, 0.2)",
     borderWidth: 1,
+  },
+  logoutContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
   },
   logoutText: {
     fontSize: 14,

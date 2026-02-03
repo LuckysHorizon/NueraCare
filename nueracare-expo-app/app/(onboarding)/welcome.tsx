@@ -1,18 +1,31 @@
 import React from "react";
-import { View, ScrollView, StyleSheet } from "react-native";
+import { View, ScrollView, StyleSheet, Platform } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
+import { BlurView } from "expo-blur";
 import { useRouter } from "expo-router";
 import { Button, Heading, Body } from "@/components/common";
-import { colors, spacing } from "@/theme/colors";
+import { spacing } from "@/theme/colors";
 import { globalStyles } from "@/theme/styles";
+import {
+  Zap,
+  MessageSquare,
+  MapPin,
+  Target,
+} from "lucide-react-native";
+
+const ACCENT = "#00BFA5";
 
 export default function WelcomeScreen() {
   const router = useRouter();
 
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      <View style={styles.content}>
+    <LinearGradient
+      colors={["#EAFBF8", "#F7FEFD", "#FFFFFF"]}
+      style={styles.container}
+    >
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
         <View style={styles.header}>
-          <Heading level={1}>Welcome to NueraCare</Heading>
+          <Heading level={1} style={styles.title}>Welcome to NueraCare</Heading>
           <Body style={styles.subtitle}>
             Your intelligent healthcare companion. Let's set up your profile.
           </Body>
@@ -20,81 +33,143 @@ export default function WelcomeScreen() {
 
         <View style={styles.features}>
           <FeatureItem
-            title="📋 Understand Your Reports"
+            icon={<Zap size={24} color={ACCENT} />}
+            title="Understand Your Reports"
             description="AI-powered explanations of medical reports in simple language"
           />
           <FeatureItem
-            title="💬 Chat About Your Health"
+            icon={<MessageSquare size={24} color={ACCENT} />}
+            title="Chat About Your Health"
             description="Ask questions about your reports with our smart assistant"
           />
           <FeatureItem
-            title="🏥 Find Care Nearby"
+            icon={<MapPin size={24} color={ACCENT} />}
+            title="Find Care Nearby"
             description="Discover hospitals and specialists near you instantly"
           />
           <FeatureItem
-            title="🎯 Track Your Health"
+            icon={<Target size={24} color={ACCENT} />}
+            title="Track Your Health"
             description="Manage tasks and stay on top of your wellness journey"
           />
         </View>
-      </View>
+      </ScrollView>
 
       <View style={styles.footer}>
-        <Button
-          title="Let's Get Started"
-          onPress={() => router.push("/(onboarding)/health-info")}
-        />
+        <BlurView intensity={60} tint="light" style={styles.blurContainer}>
+          <Button
+            title="Let's Get Started"
+            onPress={() => router.push("/(onboarding)/health-info")}
+          />
+        </BlurView>
       </View>
-    </ScrollView>
+    </LinearGradient>
   );
 }
 
 function FeatureItem({
+  icon,
   title,
   description,
 }: {
+  icon: React.ReactNode;
   title: string;
   description: string;
 }) {
   return (
     <View style={styles.featureItem}>
-      <Heading level={4}>{title}</Heading>
-      <Body style={styles.featureDescription}>{description}</Body>
+      <BlurView intensity={50} tint="light" style={styles.featureBlurvView}>
+        <View style={styles.featureContent}>
+          <View style={styles.iconBox}>{icon}</View>
+          <View style={styles.textBox}>
+            <Heading level={4} style={styles.featureTitle}>{title}</Heading>
+            <Body style={styles.featureDescription}>{description}</Body>
+          </View>
+        </View>
+      </BlurView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    ...globalStyles.container,
-    paddingHorizontal: spacing.lg,
+    flex: 1,
   },
   content: {
-    paddingVertical: spacing.xxxl,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.xxl,
+    paddingTop: Platform.OS === "ios" ? spacing.xxl : spacing.xl,
   },
   header: {
     marginBottom: spacing.xxxl,
-    marginTop: spacing.xxl,
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: "700",
+    color: "#0F172A",
+    fontFamily: "Inter",
   },
   subtitle: {
-    color: colors.textLight,
+    color: "#6B7280",
     marginTop: spacing.md,
-    fontSize: 16,
+    fontSize: 15,
     lineHeight: 24,
+    fontFamily: "Inter",
   },
   features: {
     gap: spacing.lg,
+    marginBottom: spacing.xxl,
   },
   featureItem: {
-    backgroundColor: colors.primary50,
-    borderRadius: 12,
+    borderRadius: 22,
+    overflow: "hidden",
+    backgroundColor: "rgba(255, 255, 255, 0.8)",
+    shadowColor: "#0F172A",
+    shadowOpacity: 0.05,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 4,
+  },
+  featureBlurvView: {
+    borderRadius: 22,
+  },
+  featureContent: {
+    flexDirection: "row",
+    alignItems: "flex-start",
     padding: spacing.lg,
+    backgroundColor: "rgba(255, 255, 255, 0.6)",
+    gap: spacing.md,
+  },
+  iconBox: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    backgroundColor: "rgba(0, 191, 165, 0.1)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  textBox: {
+    flex: 1,
+  },
+  featureTitle: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#0F172A",
+    fontFamily: "Inter",
   },
   featureDescription: {
-    color: colors.textLight,
-    marginTop: spacing.sm,
-    fontSize: 14,
+    color: "#6B7280",
+    marginTop: spacing.xs,
+    fontSize: 13,
+    lineHeight: 18,
+    fontFamily: "Inter",
   },
   footer: {
-    paddingVertical: spacing.xl,
+    padding: spacing.lg,
+    paddingBottom: Platform.OS === "ios" ? spacing.xxl : spacing.lg,
+  },
+  blurContainer: {
+    borderRadius: 16,
+    overflow: "hidden",
   },
 });
