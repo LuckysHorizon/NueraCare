@@ -34,7 +34,35 @@
           "type": "string"
         }
       },
-      "clerkId": {
+      "reportId": {
+        "type": "objectAttribute",
+        "value": {
+          "type": "string"
+        },
+        "optional": true
+      },
+      "userId": {
+        "type": "objectAttribute",
+        "value": {
+          "type": "string"
+        },
+        "optional": true
+      },
+      "fileUrl": {
+        "type": "objectAttribute",
+        "value": {
+          "type": "string"
+        },
+        "optional": true
+      },
+      "extractedText": {
+        "type": "objectAttribute",
+        "value": {
+          "type": "string"
+        },
+        "optional": true
+      },
+      "uploadDate": {
         "type": "objectAttribute",
         "value": {
           "type": "string"
@@ -75,6 +103,13 @@
               "value": "other"
             }
           ]
+        },
+        "optional": true
+      },
+      "clerkId": {
+        "type": "objectAttribute",
+        "value": {
+          "type": "string"
         },
         "optional": true
       },

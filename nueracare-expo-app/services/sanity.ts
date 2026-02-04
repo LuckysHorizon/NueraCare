@@ -251,12 +251,11 @@ export async function completeOnboarding(clerkId: string) {
 
 // ===== MEDICAL REPORTS =====
 
-// Get medical reports for user
-export async function getMedicalReports(clerkId: string): Promise<MedicalReport[]> {
+export async function getMedicalReports(userId: string): Promise<MedicalReport[]> {
   try {
     const reports = await sanityClient.fetch(
-      `*[_type == "medicalReport" && clerkId == $clerkId] | order(reportDate desc)`,
-      { clerkId }
+      `*[_type == "medicalReport" && userId == $userId] | order(uploadDate desc)`,
+      { userId }
     );
     return reports;
   } catch (error) {
@@ -265,19 +264,48 @@ export async function getMedicalReports(clerkId: string): Promise<MedicalReport[
   }
 }
 
-// Create medical report
+export async function getMedicalReportByIds(userId: string, reportId: string) {
+  try {
+    const report = await sanityClient.fetch(
+      `*[_type == "medicalReport" && userId == $userId && reportId == $reportId][0]`,
+      { userId, reportId }
+    );
+    return report as MedicalReport | null;
+  } catch (error) {
+    console.error("Error fetching medical report:", error);
+    throw error;
+  }
+}
+
 export async function createMedicalReport(
-  clerkId: string,
+  userId: string,
+  reportId: string,
   reportData: Partial<MedicalReport>
 ) {
-  const doc = {
-    _type: "medicalReport",
-    clerkId,
-    ...reportData,
-    uploadedAt: new Date().toISOString(),
-  };
-
   try {
+    const existing = await sanityClient.fetch(
+      `*[_type == "medicalReport" && userId == $userId && reportId == $reportId][0]{_id}`,
+      { userId, reportId }
+    );
+
+    if (existing?._id) {
+      return await sanityClient
+        .patch(existing._id)
+        .set({
+          ...reportData,
+          userId,
+          reportId,
+        })
+        .commit();
+    }
+
+    const doc = {
+      _type: "medicalReport" as const,
+      userId,
+      reportId,
+      ...reportData,
+    };
+
     return await sanityClient.create(doc);
   } catch (error) {
     console.error("Error creating medical report:", error);

@@ -19,8 +19,13 @@ export type MedicalReport = {
   _createdAt: string;
   _updatedAt: string;
   _rev: string;
-  clerkId?: string;
+  reportId?: string;
+  userId?: string;
+  fileUrl?: string;
+  extractedText?: string;
+  uploadDate?: string;
   reportType?: "blood-test" | "xray" | "ecg" | "ultrasound" | "ct-scan" | "mri" | "other";
+  clerkId?: string;
   reportDate?: string;
   hospitalName?: string;
   doctorName?: string;
