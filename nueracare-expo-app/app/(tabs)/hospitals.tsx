@@ -16,6 +16,7 @@ import {
   Linking,
   Modal,
 } from "react-native";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Location from "expo-location";
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
@@ -76,7 +77,15 @@ const SPECIALTIES = [
   "Gastroenterology",
 ];
 
+const RATING_FILTERS = [
+  { label: "All", value: 0 },
+  { label: "4.5+", value: 4.5 },
+  { label: "4.0+", value: 4.0 },
+  { label: "3.5+", value: 3.5 },
+];
+
 export default function HospitalsScreen() {
+  const insets = useSafeAreaInsets();
   const [location, setLocation] = useState<LocationCoords | null>(null);
   const [selectedCity, setSelectedCity] = useState("Hyderabad");
   const [hospitals, setHospitals] = useState<Hospital[]>([]);
@@ -89,8 +98,10 @@ export default function HospitalsScreen() {
   const [hospitalDetailsVisible, setHospitalDetailsVisible] = useState(false);
   const [showCitySelector, setShowCitySelector] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [minRating, setMinRating] = useState(0);
 
   const MAJOR_CITIES = [
+    "Use my location",
     "Hyderabad",
     "Bangalore",
     "Chennai",
@@ -111,7 +122,21 @@ export default function HospitalsScreen() {
     }
   }, [selectedCity, location]);
 
-  const requestLocationPermission = async () => {
+  useEffect(() => {
+    const trimmed = searchQuery.trim();
+    if (trimmed.length < 2) {
+      filterHospitals(hospitals, "", selectedSpecialty, minRating);
+      return;
+    }
+
+    const timeout = setTimeout(() => {
+      searchHospitals(trimmed);
+    }, 400);
+
+    return () => clearTimeout(timeout);
+  }, [searchQuery, selectedSpecialty, minRating, location, selectedCity]);
+
+  const requestLocationPermission = async (): Promise<LocationCoords | null> => {
     setLoadingLocation(true);
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
@@ -122,7 +147,9 @@ export default function HospitalsScreen() {
           longitude: userLocation.coords.longitude,
         };
         setLocation(coords);
+        setSelectedCity("Current Location");
         console.log("📍 Got user location:", coords);
+        return coords;
       } else {
         // Fallback: use city coordinates
         console.log("⚠️ Location permission denied, using city coordinates");
@@ -133,6 +160,7 @@ export default function HospitalsScreen() {
     } finally {
       setLoadingLocation(false);
     }
+    return null;
   };
 
   const fetchHospitals = async () => {
@@ -142,7 +170,12 @@ export default function HospitalsScreen() {
       // Get coordinates for the city if no GPS location
       let coords = location;
       if (!coords) {
-        coords = getCityCoordinates(selectedCity);
+        if (selectedCity === "Current Location") {
+          coords = await requestLocationPermission();
+        }
+        if (!coords) {
+          coords = getCityCoordinates(selectedCity);
+        }
       }
 
       if (!coords) {
@@ -159,7 +192,7 @@ export default function HospitalsScreen() {
         throw new Error("EXPO_PUBLIC_API_URL is not configured in .env.local");
       }
 
-      const url = `${apiUrl}/api/hospitals/nearby?latitude=${coords.latitude}&longitude=${coords.longitude}&radius=5000&limit=10`;
+      const url = `${apiUrl}/api/hospitals/nearby?latitude=${coords.latitude}&longitude=${coords.longitude}&radius=5000&limit=10&min_rating=${minRating}`;
       console.log("📡 Fetching from:", url);
 
       // Fetch from backend which uses Google Places API
@@ -183,7 +216,7 @@ export default function HospitalsScreen() {
       
       if (data.hospitals && Array.isArray(data.hospitals)) {
         setHospitals(data.hospitals);
-        filterHospitals(data.hospitals, searchQuery, selectedSpecialty);
+        filterHospitals(data.hospitals, searchQuery, selectedSpecialty, minRating);
       } else {
         throw new Error("Invalid response format: missing hospitals array");
       }
@@ -197,12 +230,58 @@ export default function HospitalsScreen() {
     }
   };
 
+  const searchHospitals = async (query: string) => {
+    setLoadingHospitals(true);
+    setError(null);
+    try {
+      let coords = location;
+      if (!coords) {
+        if (selectedCity === "Current Location") {
+          coords = await requestLocationPermission();
+        }
+        if (!coords) {
+          coords = getCityCoordinates(selectedCity);
+        }
+      }
+
+      if (!coords) {
+        setError("Cannot determine location");
+        setLoadingHospitals(false);
+        return;
+      }
+
+      const apiUrl = process.env.EXPO_PUBLIC_API_URL;
+      if (!apiUrl) {
+        throw new Error("EXPO_PUBLIC_API_URL is not configured in .env.local");
+      }
+
+      const url = `${apiUrl}/api/hospitals/search?query=${encodeURIComponent(query)}&latitude=${coords.latitude}&longitude=${coords.longitude}&radius=5000&limit=10&min_rating=${minRating}`;
+      const response = await fetch(url);
+
+      if (!response.ok) {
+        throw new Error("Failed to search hospitals");
+      }
+
+      const data = await response.json();
+      setHospitals(data.hospitals);
+      filterHospitals(data.hospitals, query, selectedSpecialty, minRating);
+    } catch (err) {
+      console.error("❌ Error searching hospitals:", err);
+      setError(err instanceof Error ? err.message : "Failed to search hospitals");
+    } finally {
+      setLoadingHospitals(false);
+    }
+  };
+
   const filterHospitals = (
     hospitalsList: Hospital[],
     query: string,
-    specialty: string | null
+    specialty: string | null,
+    minRatingValue: number
   ) => {
-    let filtered = [...hospitalsList];
+    let filtered = [...hospitalsList].filter((h) =>
+      h.types?.some((t) => t.toLowerCase() === "hospital")
+    );
 
     if (query.trim()) {
       filtered = filtered.filter(
@@ -224,26 +303,56 @@ export default function HospitalsScreen() {
       );
     }
 
+    if (minRatingValue > 0) {
+      filtered = filtered.filter((h) => (h.rating || 0) >= minRatingValue);
+    }
+
     filtered.sort((a, b) => a.distance - b.distance);
     setFilteredHospitals(filtered);
   };
 
   const handleSearch = (query: string) => {
     setSearchQuery(query);
-    filterHospitals(hospitals, query, selectedSpecialty);
+    if (!query.trim()) {
+      filterHospitals(hospitals, "", selectedSpecialty, minRating);
+    }
   };
 
   const handleSpecialtyFilter = (specialty: string) => {
     const newSpecialty = selectedSpecialty === specialty ? null : specialty;
     setSelectedSpecialty(newSpecialty);
-    filterHospitals(hospitals, searchQuery, newSpecialty);
+    filterHospitals(hospitals, searchQuery, newSpecialty, minRating);
   };
 
-  const handleCall = async (phone?: string) => {
+  const handleRatingFilter = (rating: number) => {
+    setMinRating(rating);
+    filterHospitals(hospitals, searchQuery, selectedSpecialty, rating);
+  };
+
+  const handleCall = async (hospital: Hospital) => {
+    let phone = hospital.phone;
+    try {
+      if (!phone) {
+        const apiUrl = process.env.EXPO_PUBLIC_API_URL;
+        if (!apiUrl) {
+          throw new Error("EXPO_PUBLIC_API_URL is not configured in .env.local");
+        }
+        const url = `${apiUrl}/api/hospitals/details?place_id=${hospital.placeId}`;
+        const response = await fetch(url);
+        if (response.ok) {
+          const data = await response.json();
+          phone = data.phone || phone;
+        }
+      }
+    } catch (err) {
+      console.error("❌ Error fetching phone:", err);
+    }
+
     if (!phone) {
       Alert.alert("Phone number not available");
       return;
     }
+
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     Linking.openURL(`tel:${phone}`);
   };
@@ -317,7 +426,7 @@ export default function HospitalsScreen() {
       },
     ];
     setHospitals(demoHospitals);
-    filterHospitals(demoHospitals, searchQuery, selectedSpecialty);
+    filterHospitals(demoHospitals, searchQuery, selectedSpecialty, minRating);
   };
 
   const topHospitals = useMemo(() => {
@@ -327,22 +436,15 @@ export default function HospitalsScreen() {
   }, [hospitals]);
 
   return (
-    <View style={styles.container}>
-      {/* Header */}
-      <BlurView intensity={80} tint="light" style={styles.header}>
-        <View style={styles.headerContent}>
-          <Text style={styles.headerTitle}>Hospitals</Text>
-          <TouchableOpacity style={styles.searchIconButton}>
-            <Search size={20} color="#1F2937" strokeWidth={1.5} />
-          </TouchableOpacity>
-        </View>
-      </BlurView>
-
+    <SafeAreaView style={styles.safeArea} edges={["top"]}>
+      <View style={styles.container}>
       <ScrollView
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 8 }]}
         showsVerticalScrollIndicator={false}
         style={styles.scrollView}
       >
+        <Text style={styles.pageTitle}>Hospitals Nearby</Text>
+
         {/* Location Selector */}
         <TouchableOpacity
           style={styles.locationPill}
@@ -388,6 +490,7 @@ export default function HospitalsScreen() {
               horizontal
               showsHorizontalScrollIndicator={false}
               scrollEventThrottle={16}
+              contentContainerStyle={{ paddingHorizontal: 0 }}
               renderItem={({ item }) => (
                 <TouchableOpacity
                   style={styles.topHospitalCard}
@@ -453,6 +556,36 @@ export default function HospitalsScreen() {
                   ]}
                 >
                   {item}
+                </Text>
+              </TouchableOpacity>
+            )}
+          />
+        </View>
+
+        {/* Rating Filters */}
+        <View style={styles.ratingFilterContainer}>
+          <FlatList
+            data={RATING_FILTERS}
+            keyExtractor={(item) => item.label}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            scrollEventThrottle={16}
+            contentContainerStyle={styles.ratingFilterList}
+            renderItem={({ item }) => (
+              <TouchableOpacity
+                style={[
+                  styles.ratingChip,
+                  minRating === item.value && styles.ratingChipActive,
+                ]}
+                onPress={() => handleRatingFilter(item.value)}
+              >
+                <Text
+                  style={[
+                    styles.ratingChipText,
+                    minRating === item.value && styles.ratingChipTextActive,
+                  ]}
+                >
+                  {item.label}
                 </Text>
               </TouchableOpacity>
             )}
@@ -552,28 +685,40 @@ export default function HospitalsScreen() {
                 <TouchableOpacity
                   style={[
                     styles.cityOption,
-                    selectedCity === item && styles.cityOptionActive,
+                    (selectedCity === item || (item === "Use my location" && selectedCity === "Current Location")) &&
+                      styles.cityOptionActive,
                   ]}
                   onPress={() => {
                     Haptics.selectionAsync();
+                    if (item === "Use my location") {
+                      requestLocationPermission();
+                      setShowCitySelector(false);
+                      return;
+                    }
                     setSelectedCity(item);
+                    setLocation(null);
                     setShowCitySelector(false);
                   }}
                 >
                   <MapPin
                     size={20}
-                    color={selectedCity === item ? "#1E88E5" : "#9CA3AF"}
+                    color={
+                      selectedCity === item || (item === "Use my location" && selectedCity === "Current Location")
+                        ? "#1E88E5"
+                        : "#9CA3AF"
+                    }
                     strokeWidth={1.5}
                   />
                   <Text
                     style={[
                       styles.cityOptionText,
-                      selectedCity === item && styles.cityOptionTextActive,
+                      (selectedCity === item || (item === "Use my location" && selectedCity === "Current Location")) &&
+                        styles.cityOptionTextActive,
                     ]}
                   >
-                    {item}
+                    {item === "Use my location" ? "Use my current location" : item}
                   </Text>
-                  {selectedCity === item && (
+                  {(selectedCity === item || (item === "Use my location" && selectedCity === "Current Location")) && (
                     <View style={styles.cityCheckmark}>
                       <Text style={styles.checkmarkText}>✓</Text>
                     </View>
@@ -700,7 +845,7 @@ export default function HospitalsScreen() {
                 <TouchableOpacity
                   style={styles.actionButton}
                   onPress={() => {
-                    handleCall(selectedHospital.phone);
+                    handleCall(selectedHospital);
                     setHospitalDetailsVisible(false);
                   }}
                 >
@@ -723,7 +868,8 @@ export default function HospitalsScreen() {
           )}
         </View>
       </Modal>
-    </View>
+      </View>
+    </SafeAreaView>
   );
 }
 
@@ -736,7 +882,7 @@ const HospitalCard = ({
 }: {
   hospital: Hospital;
   onPress: () => void;
-  onCall: (phone?: string) => void;
+  onCall: (hospital: Hospital) => void;
   onDirections: (hospital: Hospital) => void;
 }) => {
   return (
@@ -783,7 +929,7 @@ const HospitalCard = ({
       <View style={styles.cardActions}>
         <TouchableOpacity
           style={styles.cardActionButton}
-          onPress={() => onCall(hospital.phone)}
+          onPress={() => onCall(hospital)}
         >
           <Phone size={18} color="#1E88E5" strokeWidth={2} />
           <Text style={styles.cardActionText}>Call</Text>
@@ -802,18 +948,23 @@ const HospitalCard = ({
 };
 
 const styles = StyleSheet.create({
-  container: {
+  safeArea: {
     flex: 1,
     backgroundColor: "#D9F0ED",
   },
+  container: {
+    flex: 1,
+    backgroundColor: "#D9F0ED",
+    width: "100%",
+  },
   scrollView: {
     flex: 1,
+    width: "100%",
   },
   scrollContent: {
-    paddingTop: 90,
+    flexGrow: 1,
     paddingBottom: 100,
-    paddingLeft: 12,
-    paddingRight: 12,
+    paddingHorizontal: 12,
   },
 
   // Header
@@ -823,12 +974,13 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     zIndex: 10,
-    paddingTop: 60,
-    paddingBottom: 16,
-    paddingHorizontal: 20,
+    paddingTop: 50,
+    paddingBottom: 12,
+    paddingHorizontal: 16,
     backgroundColor: "rgba(217, 240, 237, 0.85)",
     borderBottomWidth: 1,
     borderBottomColor: "rgba(46, 196, 182, 0.1)",
+    width: "100%",
   },
   headerContent: {
     flexDirection: "row",
@@ -876,13 +1028,15 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
-    paddingHorizontal: 16,
+    paddingHorizontal: 14,
     paddingVertical: 12,
     backgroundColor: "rgba(255, 255, 255, 0.95)",
     borderRadius: 26,
     marginBottom: 24,
+    marginHorizontal: 0,
     borderWidth: 1,
     borderColor: "rgba(46, 196, 182, 0.2)",
+    width: "100%",
   },
   searchInput: {
     flex: 1,
@@ -894,6 +1048,14 @@ const styles = StyleSheet.create({
   // Sections
   sectionContainer: {
     marginBottom: 24,
+    width: "100%",
+  },
+  pageTitle: {
+    fontSize: 22,
+    fontWeight: "700",
+    color: "#1F2937",
+    marginBottom: 12,
+    marginHorizontal: 4,
   },
   sectionHeader: {
     flexDirection: "row",
@@ -996,14 +1158,47 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
   },
 
+  // Rating Filters
+  ratingFilterContainer: {
+    marginBottom: 20,
+    marginHorizontal: -4,
+  },
+  ratingFilterList: {
+    gap: 8,
+    paddingHorizontal: 4,
+  },
+  ratingChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    backgroundColor: "rgba(255, 255, 255, 0.9)",
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "rgba(46, 196, 182, 0.15)",
+  },
+  ratingChipActive: {
+    backgroundColor: "#0EA5E9",
+    borderColor: "#0EA5E9",
+  },
+  ratingChipText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#6B7280",
+  },
+  ratingChipTextActive: {
+    color: "#FFFFFF",
+  },
+
   // Hospital List
   hospitalsList: {
     gap: 12,
   },
+  // Hospital Card
   hospitalCard: {
     backgroundColor: "rgba(255, 255, 255, 0.95)",
     borderRadius: 24,
-    padding: 16,
+    padding: 14,
+    marginHorizontal: 0,
+    marginBottom: 12,
     borderWidth: 1,
     borderColor: "rgba(46, 196, 182, 0.15)",
     shadowColor: "#2EC4B6",
@@ -1127,9 +1322,9 @@ const styles = StyleSheet.create({
   // Emergency Button
   emergencyButton: {
     position: "absolute",
-    bottom: 24,
-    left: 16,
-    right: 16,
+    bottom: 20,
+    left: 12,
+    right: 12,
     height: 56,
     borderRadius: 16,
     overflow: "hidden",
@@ -1138,6 +1333,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 12,
     elevation: 8,
+    width: "auto",
   },
   emergencyGradient: {
     flex: 1,
