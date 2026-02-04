@@ -290,3 +290,35 @@ export async function fetchChatHistory(
     return null;
   }
 }
+
+export async function transcribeAudio(audioUri: string): Promise<string> {
+  const baseUrl = getBackendBaseUrl();
+  const endpoint = "/api/transcribe-audio";
+
+  try {
+    const formData = new FormData();
+    
+    // Create file object from audio URI
+    formData.append("audio_file", {
+      uri: audioUri,
+      name: "recording.m4a",
+      type: "audio/m4a",
+    } as unknown as Blob);
+
+    const response = await fetch(`${baseUrl}${endpoint}`, {
+      method: "POST",
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.detail || "Failed to transcribe audio");
+    }
+
+    const data = await response.json();
+    return data.transcription || "";
+  } catch (error) {
+    console.error("Error transcribing audio:", error);
+    throw error;
+  }
+}
