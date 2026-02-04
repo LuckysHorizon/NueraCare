@@ -1,52 +1,68 @@
 import React, { useMemo, useState } from "react";
-import { View, ScrollView, StyleSheet, Platform, SafeAreaView } from "react-native";
+import { View, ScrollView, StyleSheet, Platform, SafeAreaView, Alert } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
+import { useUser } from "@clerk/clerk-expo";
 import { Button, Heading, Body } from "@/components/common";
 import { CatalogChip, OptionalNoteInput } from "@/components/onboarding";
 import { OnboardingHeader } from "../../components/onboarding-header";
 import { colors, spacing } from "@/theme/colors";
+import { updateOnboardingField } from "@/services/onboarding";
 
-const CONDITIONS = [
-  "Diabetes",
-  "Blood Pressure",
-  "Heart related",
-  "Thyroid",
-  "None",
-  "Other",
+const FOCUS_AREAS = [
+  { id: "heart-health", label: "Heart Health" },
+  { id: "mental-wellness", label: "Mental Wellness" },
+  { id: "fitness", label: "Fitness" },
+  { id: "nutrition", label: "Nutrition" },
+  { id: "sleep", label: "Sleep" },
+  { id: "stress", label: "Stress Management" },
+  { id: "chronic-condition", label: "Chronic Condition" },
+  { id: "preventive-care", label: "Preventive Care" },
 ];
 
 export default function HealthContextScreen() {
   const router = useRouter();
-  const [selected, setSelected] = useState<string[]>([]);
+  const { user } = useUser();
+  const [isSaving, setIsSaving] = useState(false);
+  const [selectedFocusAreas, setSelectedFocusAreas] = useState<string[]>([]);
   const [optionalNote, setOptionalNote] = useState("");
 
   const payload = useMemo(
     () => ({
-      selectedOptions: selected,
+      selectedOptions: selectedFocusAreas,
       optionalNote: optionalNote.trim() ? optionalNote.trim() : null,
     }),
-    [selected, optionalNote]
+    [selectedFocusAreas, optionalNote]
   );
 
-  const toggleOption = (value: string) => {
-    if (value === "None") {
-      setSelected(["None"]);
-      return;
-    }
-    setSelected((prev) => {
-      const next = prev.includes(value)
-        ? prev.filter((item) => item !== value)
-        : [...prev.filter((item) => item !== "None"), value];
-      return next;
-    });
+  const toggleFocusArea = (id: string) => {
+    setSelectedFocusAreas((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
   };
 
-  const showOther = selected.includes("Other");
+  const handleContinue = async () => {
+    if (!user?.id) {
+      Alert.alert("Error", "User not authenticated");
+      return;
+    }
 
-  const handleContinue = () => {
-    console.log("Health context payload", payload);
-    router.push("/(onboarding)/reminders");
+    if (selectedFocusAreas.length === 0) {
+      Alert.alert("Validation", "Please select at least one focus area");
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      console.log("Saving focus areas for user:", user.id);
+      await updateOnboardingField(user.id, "focusAreas", selectedFocusAreas);
+      console.log("Focus areas saved successfully");
+      router.push("/(onboarding)/reminders");
+    } catch (error) {
+      console.error("Error saving focus areas:", error);
+      Alert.alert("Error", "Failed to save focus areas. Please try again.");
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -58,34 +74,24 @@ export default function HealthContextScreen() {
           contentContainerStyle={[styles.content, styles.contentGrow]}
         >
         <Body style={styles.subtitle}>
-          Choose any that apply. This helps us explain things better.
+          Choose the health areas most important to you. We'll personalize your care recommendations.
         </Body>
 
         <View style={styles.chipGrid}>
-          {CONDITIONS.map((item) => (
+          {FOCUS_AREAS.map((area) => (
             <CatalogChip
-              key={item}
-              label={item}
-              selected={selected.includes(item)}
-              onPress={() => toggleOption(item)}
-              accessibilityLabel={`Condition ${item}`}
+              key={area.id}
+              label={area.label}
+              selected={selectedFocusAreas.includes(area.id)}
+              onPress={() => toggleFocusArea(area.id)}
+              accessibilityLabel={area.label}
             />
           ))}
         </View>
-
-        {showOther ? (
-          <OptionalNoteInput
-            value={optionalNote}
-            onChangeText={setOptionalNote}
-            placeholder="Add a short note"
-            helperText="Optional. Helps us personalize explanations. Not a diagnosis."
-            accessibilityLabel="Other condition note"
-          />
-        ) : null}
         </ScrollView>
 
         <View style={styles.footer}>
-          <Button title="Continue" onPress={handleContinue} />
+          <Button title="Continue" onPress={handleContinue} disabled={isSaving} />
         </View>
       </LinearGradient>
     </SafeAreaView>

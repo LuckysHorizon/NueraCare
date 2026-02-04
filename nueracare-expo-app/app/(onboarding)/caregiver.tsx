@@ -1,19 +1,24 @@
 import React, { useMemo, useState } from "react";
-import { View, ScrollView, StyleSheet, Platform, Text, SafeAreaView } from "react-native";
+import { View, ScrollView, StyleSheet, Platform, Text, SafeAreaView, TextInput, Alert } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
+import { useUser } from "@clerk/clerk-expo";
 import { Button, Heading, Body } from "@/components/common";
 import { CatalogCard, CatalogChip, OptionalNoteInput } from "@/components/onboarding";
 import { OnboardingHeader } from "../../components/onboarding-header";
 import { colors, spacing } from "@/theme/colors";
+import { updateOnboardingField } from "@/services/onboarding";
 
 const RELATIONSHIPS = ["Son", "Daughter", "Spouse", "Doctor", "Other"];
 
 export default function CaregiverScreen() {
   const router = useRouter();
+  const { user } = useUser();
+  const [isSaving, setIsSaving] = useState(false);
   const [hasCaregiver, setHasCaregiver] = useState<string>("");
   const [relationship, setRelationship] = useState<string>("");
-  const [optionalNote, setOptionalNote] = useState("");
+  const [caregiverName, setCaregiverName] = useState("");
+  const [caregiverPhone, setCaregiverPhone] = useState("");
 
   const payload = useMemo(
     () => ({
@@ -21,20 +26,55 @@ export default function CaregiverScreen() {
         `Caregiver: ${hasCaregiver || "Not set"}`,
         hasCaregiver === "Yes" && relationship ? `Relationship: ${relationship}` : "",
       ].filter(Boolean),
-      optionalNote: optionalNote.trim() ? optionalNote.trim() : null,
     }),
-    [hasCaregiver, relationship, optionalNote]
+    [hasCaregiver, relationship]
   );
 
-  const handleContinue = () => {
+  const handleContinue = async () => {
+    if (!user?.id) {
+      Alert.alert("Error", "User not authenticated");
+      return;
+    }
+
     if (!hasCaregiver) {
-      return alert("Please select yes or no.");
+      Alert.alert("Validation", "Please select yes or no");
+      return;
     }
-    if (hasCaregiver === "Yes" && !relationship) {
-      return alert("Please choose a relationship.");
+
+    if (hasCaregiver === "Yes") {
+      if (!relationship) {
+        Alert.alert("Validation", "Please choose a relationship");
+        return;
+      }
+      if (!caregiverName.trim()) {
+        Alert.alert("Validation", "Please enter caregiver's name");
+        return;
+      }
     }
-    console.log("Caregiver payload", payload);
-    router.push("/(onboarding)/permissions-camera");
+
+    setIsSaving(true);
+    try {
+      console.log("Saving caregiver info for user:", user.id);
+      
+      let caregiverData = { hasCaregivers: hasCaregiver === "Yes" };
+      
+      if (hasCaregiver === "Yes") {
+        caregiverData = {
+          ...caregiverData,
+          name: caregiverName.trim(),
+          phone: caregiverPhone.trim(),
+          relationship: relationship,
+        } as any;
+      }
+
+      await updateOnboardingField(user.id, "caregiverInfo", caregiverData);
+      console.log("Caregiver info saved successfully");
+      router.push("/(onboarding)/permissions-camera");
+    } catch (error) {
+      console.error("Error saving caregiver info:", error);
+      Alert.alert("Error", "Failed to save caregiver information. Please try again.");
+      setIsSaving(false);
+    }
   };
 
   const showOther = relationship === "Other";
@@ -78,21 +118,33 @@ export default function CaregiverScreen() {
                 />
               ))}
             </View>
-            {showOther ? (
-              <OptionalNoteInput
-                value={optionalNote}
-                onChangeText={setOptionalNote}
-                placeholder="Add relationship details"
-                helperText="Optional. Helps us personalize caregiver messages."
-                accessibilityLabel="Caregiver relationship note"
-              />
-            ) : null}
+
+            <Text style={styles.sectionLabel}>Caregiver's Name</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Enter caregiver's name"
+              value={caregiverName}
+              onChangeText={setCaregiverName}
+              editable={!isSaving}
+              placeholderTextColor={colors.textLight}
+            />
+
+            <Text style={styles.sectionLabel}>Caregiver's Phone (Optional)</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Enter phone number"
+              value={caregiverPhone}
+              onChangeText={setCaregiverPhone}
+              keyboardType="phone-pad"
+              editable={!isSaving}
+              placeholderTextColor={colors.textLight}
+            />
           </View>
         ) : null}
         </ScrollView>
 
         <View style={styles.footer}>
-          <Button title="Continue" onPress={handleContinue} />
+          <Button title="Continue" onPress={handleContinue} disabled={isSaving} />
         </View>
       </LinearGradient>
     </SafeAreaView>
@@ -144,6 +196,17 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: spacing.sm,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: colors.gray200,
+    borderRadius: 12,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+    fontSize: 14,
+    color: colors.text,
+    marginBottom: spacing.md,
+    fontFamily: "Inter",
   },
   footer: {
     paddingHorizontal: spacing.lg,

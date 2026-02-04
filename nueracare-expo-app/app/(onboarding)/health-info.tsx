@@ -15,6 +15,7 @@ import { useUser } from "@clerk/clerk-expo";
 import { Button, Heading, Body } from "@/components/common";
 import { spacing } from "@/theme/colors";
 import { upsertUserProfile } from "@/services/sanity";
+import { updateOnboardingField } from "@/services/onboarding";
 import { Heart, Ruler, Weight } from "lucide-react-native";
 
 const ACCENT = "#00BFA5";
@@ -28,8 +29,10 @@ export default function HealthInfoScreen() {
     bloodGroup: "",
     height: "",
     weight: "",
-    chronicDiseases: "",
-    primaryLanguage: "English",
+    conditions: "",
+    medications: "",
+    allergies: "",
+    surgeries: "",
   });
 
   const handleNext = async () => {
@@ -40,7 +43,7 @@ export default function HealthInfoScreen() {
 
     setLoading(true);
     try {
-      // Save to Sanity
+      // Save to user profile
       await upsertUserProfile(user.id, {
         clerkId: user.id,
         firstName: user.firstName || "",
@@ -51,14 +54,32 @@ export default function HealthInfoScreen() {
         bloodGroup: formData.bloodGroup,
         height: parseInt(formData.height) || 0,
         weight: parseInt(formData.weight) || 0,
-        chronicDiseases: formData.chronicDiseases,
-        primaryLanguage: formData.primaryLanguage,
-        highContrast: false,
-        largeTextMode: true,
-        reducedMotion: false,
         createdAt: new Date().toISOString(),
       });
-      router.push("/(onboarding)/accessibility");
+
+      // Save to onboarding data
+      await updateOnboardingField(user.id, "healthContext", {
+        hasConditions: formData.conditions.trim().length > 0,
+        conditions: formData.conditions
+          .split(",")
+          .map((c) => c.trim())
+          .filter((c) => c.length > 0),
+        medications: formData.medications
+          .split(",")
+          .map((m) => m.trim())
+          .filter((m) => m.length > 0),
+        allergies: formData.allergies
+          .split(",")
+          .map((a) => a.trim())
+          .filter((a) => a.length > 0),
+        surgeries: formData.surgeries
+          .split(",")
+          .map((s) => s.trim())
+          .filter((s) => s.length > 0),
+      });
+
+      console.log("✅ Health info saved");
+      router.push("/(onboarding)/health-context");
     } catch (error) {
       console.error("Error saving health info:", error);
       alert("Failed to save health information. Please try again.");
@@ -68,7 +89,7 @@ export default function HealthInfoScreen() {
   };
 
   const handleSkip = () => {
-    router.push("/(onboarding)/accessibility");
+    router.push("/(onboarding)/health-context");
   };
 
   return (
@@ -100,6 +121,7 @@ export default function HealthInfoScreen() {
             value={formData.age}
             onChangeText={(age) => setFormData({ ...formData, age })}
             keyboardType="numeric"
+
           />
 
           <View style={styles.row}>
@@ -127,10 +149,40 @@ export default function HealthInfoScreen() {
 
           <InputField
             icon={<Heart size={18} color={ACCENT} />}
-            label="Chronic Diseases (if any)"
-            placeholder="List any chronic conditions..."
-            value={formData.chronicDiseases}
-            onChangeText={(chronicDiseases) => setFormData({ ...formData, chronicDiseases })}
+            label="Medical Conditions"
+            placeholder="e.g., Diabetes, Hypertension (comma separated)"
+            value={formData.conditions}
+            onChangeText={(conditions) => setFormData({ ...formData, conditions })}
+            multiline
+            numberOfLines={3}
+          />
+
+          <InputField
+            icon={<Heart size={18} color={ACCENT} />}
+            label="Current Medications"
+            placeholder="e.g., Metformin, Lisinopril (comma separated)"
+            value={formData.medications}
+            onChangeText={(medications) => setFormData({ ...formData, medications })}
+            multiline
+            numberOfLines={3}
+          />
+
+          <InputField
+            icon={<Heart size={18} color={ACCENT} />}
+            label="Known Allergies"
+            placeholder="e.g., Penicillin, Nuts (comma separated)"
+            value={formData.allergies}
+            onChangeText={(allergies) => setFormData({ ...formData, allergies })}
+            multiline
+            numberOfLines={3}
+          />
+
+          <InputField
+            icon={<Heart size={18} color={ACCENT} />}
+            label="Previous Surgeries"
+            placeholder="e.g., Appendectomy, Cataract Surgery (comma separated)"
+            value={formData.surgeries}
+            onChangeText={(surgeries) => setFormData({ ...formData, surgeries })}
             multiline
             numberOfLines={3}
           />
@@ -141,6 +193,7 @@ export default function HealthInfoScreen() {
         <Button
           title={loading ? "Saving..." : "Continue"}
           onPress={handleNext}
+          disabled={loading}
         />
         <TouchableOpacity
           style={styles.skipButton}

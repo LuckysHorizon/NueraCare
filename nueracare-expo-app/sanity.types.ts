@@ -24,14 +24,7 @@ export type MedicalReport = {
   fileUrl?: string;
   extractedText?: string;
   uploadDate?: string;
-  reportType?:
-    | "blood-test"
-    | "xray"
-    | "ecg"
-    | "ultrasound"
-    | "ct-scan"
-    | "mri"
-    | "other";
+  reportType?: "blood-test" | "xray" | "ecg" | "ultrasound" | "ct-scan" | "mri" | "other";
   clerkId?: string;
   reportDate?: string;
   hospitalName?: string;
@@ -62,12 +55,7 @@ export type OnboardingProgress = {
   accessibilityCompleted?: boolean;
   permissionsCompleted?: boolean;
   onboardingCompleted?: boolean;
-  currentStep?:
-    | "welcome"
-    | "health-info"
-    | "accessibility"
-    | "permissions"
-    | "complete";
+  currentStep?: "welcome" | "health-info" | "accessibility" | "permissions" | "complete";
   startedAt?: string;
   completedAt?: string;
 };
@@ -88,13 +76,7 @@ export type UserProfile = {
   height?: number;
   weight?: number;
   chronicDiseases?: string;
-  primaryLanguage?:
-    | "english"
-    | "hindi"
-    | "tamil"
-    | "telugu"
-    | "kannada"
-    | "malayalam";
+  primaryLanguage?: "english" | "hindi" | "tamil" | "telugu" | "kannada" | "malayalam";
   caregiverName?: string;
   caregiverPhone?: string;
   highContrast?: boolean;
@@ -223,26 +205,5 @@ export type SanityAssetSourceData = {
   url?: string;
 };
 
-export type AllSanitySchemaTypes =
-  | MedicalReport
-  | OnboardingProgress
-  | UserProfile
-  | SanityImagePaletteSwatch
-  | SanityImagePalette
-  | SanityImageDimensions
-  | SanityImageHotspot
-  | SanityImageCrop
-  | SanityFileAsset
-  | SanityImageAsset
-  | SanityImageMetadata
-  | Geopoint
-  | Slug
-  | SanityAssetSourceData;
-
+export type AllSanitySchemaTypes = MedicalReport | OnboardingProgress | UserProfile | SanityImagePaletteSwatch | SanityImagePalette | SanityImageDimensions | SanityImageHotspot | SanityImageCrop | SanityFileAsset | SanityImageAsset | SanityImageMetadata | Geopoint | Slug | SanityAssetSourceData;
 export declare const internalGroqTypeReferenceTo: unique symbol;
-
-type ArrayOf<T> = Array<
-  T & {
-    _key: string;
-  }
->;

@@ -1,20 +1,43 @@
 import React, { useEffect } from "react";
-import { View, ScrollView, StyleSheet } from "react-native";
+import { View, ScrollView, StyleSheet, Alert } from "react-native";
 import { useRouter } from "expo-router";
+import { useUser } from "@clerk/clerk-expo";
 import { Button, Heading, Body } from "@/components/common";
 import { colors, spacing } from "@/theme/colors";
 import { globalStyles } from "@/theme/styles";
+import { completeOnboarding } from "@/services/onboarding";
 
 export default function CompleteScreen() {
   const router = useRouter();
+  const { user } = useUser();
 
   useEffect(() => {
-    // Auto-navigate after 3 seconds
-    const timer = setTimeout(() => {
-      router.replace("/(tabs)/home");
-    }, 3000);
-    return () => clearTimeout(timer);
-  }, []);
+    const markComplete = async () => {
+      if (!user?.id) return;
+      
+      try {
+        console.log("Marking onboarding as complete for user:", user.id);
+        await completeOnboarding(user.id);
+        console.log("Onboarding marked complete successfully");
+        
+        // Auto-navigate after 3 seconds
+        const timer = setTimeout(() => {
+          router.replace("/(tabs)/home");
+        }, 3000);
+        return () => clearTimeout(timer);
+      } catch (error) {
+        console.error("Error completing onboarding:", error);
+        Alert.alert("Notice", "Onboarding marked complete. Proceeding to dashboard...");
+        // Still navigate even if there's an error
+        const timer = setTimeout(() => {
+          router.replace("/(tabs)/home");
+        }, 3000);
+        return () => clearTimeout(timer);
+      }
+    };
+
+    markComplete();
+  }, [user?.id]);
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>

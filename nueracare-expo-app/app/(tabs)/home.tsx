@@ -1,22 +1,9 @@
 /**
  * NueraCare Home Screen (Dashboard)
- * Futuristic Healthcare UI with Glassmorphism
- * 
- * Design Features:
- * - White theme with mint-teal accent (#00BFA5)
- * - Glassmorphism cards with blur effect
- * - SVG health score ring
- * - Smooth animations with Reanimated
- * - WCAG AA accessibility compliance
- * 
- * Tech Stack:
- * - React Native + Expo
- * - Expo Vector Icons
- * - React Native SVG
- * - React Native Reanimated
+ * Simplified with Health Quotes
  */
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { View, ScrollView, StyleSheet, Text, TouchableOpacity } from "react-native";
 import { useUser } from "@clerk/clerk-expo";
 import { useRouter } from "expo-router";
@@ -25,7 +12,6 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { BlurView } from "expo-blur";
 import Svg, { Circle } from "react-native-svg";
 import { MaterialCommunityIcons, Feather } from "@expo/vector-icons";
-
 
 // Health Score Ring Component
 interface HealthScoreRingProps {
@@ -42,7 +28,6 @@ function HealthScoreRing({ score, size = 80 }: HealthScoreRingProps) {
   return (
     <View style={styles.scoreContainer}>
       <Svg width={size} height={size} style={styles.scoreSvg}>
-        {/* Background circle */}
         <Circle
           cx={size / 2}
           cy={size / 2}
@@ -51,7 +36,6 @@ function HealthScoreRing({ score, size = 80 }: HealthScoreRingProps) {
           strokeWidth={strokeWidth}
           fill="transparent"
         />
-        {/* Progress circle */}
         <Circle
           cx={size / 2}
           cy={size / 2}
@@ -74,13 +58,33 @@ function HealthScoreRing({ score, size = 80 }: HealthScoreRingProps) {
   );
 }
 
+// Health Quotes Data
+const healthQuotes = [
+  {
+    id: 1,
+    quote: "Take care of your body. It's the only place you have to live.",
+    author: "Jim Rohn",
+    icon: "heart",
+  },
+  {
+    id: 2,
+    quote: "Health is a state of complete physical, mental and social well-being.",
+    author: "WHO Definition",
+    icon: "brain",
+  },
+  {
+    id: 3,
+    quote: "An ounce of prevention is worth a pound of cure.",
+    author: "Benjamin Franklin",
+    icon: "shield-check",
+  },
+];
+
 export default function HomeScreen() {
   const { user } = useUser();
   const router = useRouter();
-  
   const [healthScore] = useState(92);
-  
-  // Get time of day for greeting
+
   const getTimeOfDay = () => {
     const hour = new Date().getHours();
     if (hour < 12) return "morning";
@@ -88,7 +92,6 @@ export default function HomeScreen() {
     return "evening";
   };
 
-  // Get user display name
   const getUserName = () => {
     if (user?.firstName) return user.firstName;
     if (user?.id) return user.id;
@@ -120,13 +123,17 @@ export default function HomeScreen() {
           <BlurView intensity={60} style={styles.blurContainer}>
             <View style={styles.cardContent}>
               <Text style={styles.cardTitle}>Health Snapshot</Text>
-              
+
               {/* Health Metrics Grid */}
               <View style={styles.metricsGrid}>
                 {/* Blood Pressure */}
                 <View style={styles.metricRow}>
                   <View style={styles.metricLeft}>
-                    <MaterialCommunityIcons name="heart-pulse" size={20} color="#00BFA5" />
+                    <MaterialCommunityIcons
+                      name="heart-pulse"
+                      size={20}
+                      color="#00BFA5"
+                    />
                     <View style={styles.metricInfo}>
                       <Text style={styles.metricLabel}>Blood Pressure</Text>
                       <Text style={styles.metricValue}>120/80</Text>
@@ -169,40 +176,45 @@ export default function HomeScreen() {
           </BlurView>
         </View>
 
-        {/* Today's Focus Card */}
-        <View style={styles.glassCard}>
-          <BlurView intensity={60} style={styles.blurContainer}>
-            <View style={styles.cardContent}>
-              <Text style={styles.cardTitle}>Today's Focus</Text>
-              
-              <View style={styles.taskRow}>
-                <View style={styles.taskLeft}>
-                  <View style={styles.taskBullet} />
-                  <Text style={styles.taskText}>Take morning medication</Text>
-                </View>
-                <TouchableOpacity
-                  style={styles.markDoneButton}
-                  accessible
-                  accessibilityLabel="Mark task as done"
-                  accessibilityRole="button"
-                >
-                  <Text style={styles.markDoneText}>Mark done</Text>
-                </TouchableOpacity>
+        {/* Health Quotes Section */}
+        <View>
+          <Text style={styles.sectionTitle}>Health Wisdom</Text>
+          <View style={styles.quotesContainer}>
+            {healthQuotes.map((quoteData) => (
+              <View key={quoteData.id} style={styles.glassCard}>
+                <BlurView intensity={60} style={styles.blurContainer}>
+                  <View style={styles.quoteContent}>
+                    <View style={styles.quoteIconContainer}>
+                      <MaterialCommunityIcons
+                        name={quoteData.icon as any}
+                        size={28}
+                        color="#00BFA5"
+                      />
+                    </View>
+                    <Text style={styles.quoteText}>"{quoteData.quote}"</Text>
+                    <Text style={styles.quoteAuthor}>— {quoteData.author}</Text>
+                  </View>
+                </BlurView>
               </View>
-            </View>
-          </BlurView>
+            ))}
+          </View>
         </View>
 
         {/* Primary Actions */}
         <View style={styles.actionsContainer}>
           <TouchableOpacity
             style={styles.primaryButton}
-            onPress={() => router.push("/report/upload")}
+            onPress={() => router.push("/(tabs)/reports")}
             accessible
             accessibilityLabel="Upload Medical Report"
             accessibilityRole="button"
           >
-            <Feather name="upload-cloud" size={24} color="#FFFFFF" style={styles.buttonIcon} />
+            <Feather
+              name="upload-cloud"
+              size={24}
+              color="#FFFFFF"
+              style={styles.buttonIcon}
+            />
             <Text style={styles.primaryButtonText}>Upload Report</Text>
           </TouchableOpacity>
 
@@ -213,7 +225,12 @@ export default function HomeScreen() {
             accessibilityLabel="Chat with AI Assistant"
             accessibilityRole="button"
           >
-            <Feather name="message-circle" size={24} color="#00BFA5" style={styles.buttonIcon} />
+            <Feather
+              name="message-circle"
+              size={24}
+              color="#00BFA5"
+              style={styles.buttonIcon}
+            />
             <Text style={styles.secondaryButtonText}>Chat with AI</Text>
           </TouchableOpacity>
         </View>
@@ -225,11 +242,10 @@ export default function HomeScreen() {
   );
 }
 
-
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: "#F0F9F8", // Soft mint-teal background
+    backgroundColor: "#F0F9F8",
   },
   container: {
     flex: 1,
@@ -238,10 +254,10 @@ const styles = StyleSheet.create({
   contentContainer: {
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.md,
-    paddingBottom: 100, // Extra padding for bottom nav
+    paddingBottom: 100,
   },
 
-  // Header: Greeting + Health Score
+  // Header
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -294,7 +310,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
 
-  // Glassmorphism Card
+  // Glass Card
   glassCard: {
     borderRadius: 24,
     marginBottom: spacing.lg,
@@ -321,7 +337,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
   },
 
-  // Health Metrics Grid
+  // Metrics Grid
   metricsGrid: {
     gap: spacing.lg,
   },
@@ -370,41 +386,44 @@ const styles = StyleSheet.create({
     color: "#00BFA5",
   },
 
-  // Today's Focus Card
-  taskRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  taskLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    flex: 1,
-    gap: spacing.sm,
-  },
-  taskBullet: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: "#00BFA5",
-  },
-  taskText: {
-    fontSize: 15,
-    fontWeight: "500",
+  // Health Quotes Section
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: "700",
     color: "#1A1A1A",
-    flex: 1,
+    marginBottom: spacing.lg,
+    marginTop: spacing.lg,
   },
-  markDoneButton: {
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
-    borderRadius: 20,
-    borderWidth: 1.5,
-    borderColor: "#00BFA5",
+  quotesContainer: {
+    gap: spacing.lg,
+    marginBottom: spacing.xl,
   },
-  markDoneText: {
-    fontSize: 14,
+  quoteContent: {
+    padding: spacing.xl,
+    backgroundColor: "rgba(255, 255, 255, 0.6)",
+    alignItems: "center",
+    gap: spacing.md,
+  },
+  quoteIconContainer: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: "rgba(0, 191, 165, 0.1)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  quoteText: {
+    fontSize: 16,
     fontWeight: "600",
-    color: "#00BFA5",
+    color: "#1A1A1A",
+    textAlign: "center",
+    lineHeight: 24,
+  },
+  quoteAuthor: {
+    fontSize: 13,
+    fontWeight: "500",
+    color: "#6B7280",
+    fontStyle: "italic",
   },
 
   // Primary Actions

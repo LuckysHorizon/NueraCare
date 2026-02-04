@@ -1,20 +1,27 @@
 import React, { useMemo, useState } from "react";
-import { View, ScrollView, StyleSheet, Platform, TouchableOpacity, Text, SafeAreaView } from "react-native";
+import { View, ScrollView, StyleSheet, Platform, TouchableOpacity, Text, SafeAreaView, Alert } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
+import { useUser } from "@clerk/clerk-expo";
 import { Button, Heading, Body } from "@/components/common";
 import { CatalogCard, ToggleTile, OptionalNoteInput } from "@/components/onboarding";
 import { OnboardingHeader } from "../../components/onboarding-header";
 import { colors, spacing } from "@/theme/colors";
+import { updateOnboardingField } from "@/services/onboarding";
 
 const TIMES = ["Morning", "Afternoon", "Evening"];
 const TYPES = ["Notification", "Voice call", "Both"];
 
 export default function RemindersScreen() {
   const router = useRouter();
+  const { user } = useUser();
+  const [isSaving, setIsSaving] = useState(false);
   const [wantsReminders, setWantsReminders] = useState<string>("");
   const [time, setTime] = useState("Morning");
   const [reminderType, setReminderType] = useState("Notification");
+  const [medicationReminders, setMedicationReminders] = useState(true);
+  const [appointmentReminders, setAppointmentReminders] = useState(true);
+  const [healthCheckReminders, setHealthCheckReminders] = useState(true);
   const [showNote, setShowNote] = useState(false);
   const [optionalNote, setOptionalNote] = useState("");
 
@@ -30,12 +37,41 @@ export default function RemindersScreen() {
     [wantsReminders, time, reminderType, optionalNote]
   );
 
-  const handleContinue = () => {
-    if (!wantsReminders) {
-      return alert("Please choose if you want reminders.");
+  const handleContinue = async () => {
+    if (!user?.id) {
+      Alert.alert("Error", "User not authenticated");
+      return;
     }
-    console.log("Reminders payload", payload);
-    router.push("/(onboarding)/caregiver");
+
+    if (!wantsReminders) {
+      Alert.alert("Validation", "Please choose if you want reminders");
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      console.log("Saving reminder preferences for user:", user.id);
+      
+      // Convert time to HH:MM format
+      let reminderTime = "09:00"; // Default morning
+      if (time === "Afternoon") reminderTime = "14:00";
+      else if (time === "Evening") reminderTime = "18:00";
+      
+      const reminderData = {
+        medicationReminders,
+        appointmentReminders,
+        healthCheckReminders,
+        reminderTime,
+      };
+
+      await updateOnboardingField(user.id, "reminders", reminderData);
+      console.log("Reminder preferences saved successfully");
+      router.push("/(onboarding)/caregiver");
+    } catch (error) {
+      console.error("Error saving reminder preferences:", error);
+      Alert.alert("Error", "Failed to save reminder preferences. Please try again.");
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -65,6 +101,28 @@ export default function RemindersScreen() {
 
         {wantsReminders === "Yes" ? (
           <View>
+            <Text style={styles.sectionLabel}>What to remind you about?</Text>
+            <View style={styles.stack}>
+              <ToggleTile
+                title="Medication Reminders"
+                selected={medicationReminders}
+                onPress={() => setMedicationReminders(!medicationReminders)}
+                accessibilityLabel="Medication Reminders"
+              />
+              <ToggleTile
+                title="Appointment Reminders"
+                selected={appointmentReminders}
+                onPress={() => setAppointmentReminders(!appointmentReminders)}
+                accessibilityLabel="Appointment Reminders"
+              />
+              <ToggleTile
+                title="Health Check Reminders"
+                selected={healthCheckReminders}
+                onPress={() => setHealthCheckReminders(!healthCheckReminders)}
+                accessibilityLabel="Health Check Reminders"
+              />
+            </View>
+
             <Text style={styles.sectionLabel}>Preferred time</Text>
             <View style={styles.stack}>
               {TIMES.map((option) => (
@@ -114,7 +172,7 @@ export default function RemindersScreen() {
         </ScrollView>
 
         <View style={styles.footer}>
-          <Button title="Continue" onPress={handleContinue} />
+          <Button title="Continue" onPress={handleContinue} disabled={isSaving} />
         </View>
       </LinearGradient>
     </SafeAreaView>

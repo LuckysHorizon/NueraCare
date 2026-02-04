@@ -1,17 +1,36 @@
 ﻿import React, { useMemo, useState } from "react";
-import { View, ScrollView, StyleSheet, Platform, Text, SafeAreaView } from "react-native";
+import { View, ScrollView, StyleSheet, Platform, Text, SafeAreaView, Alert } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
+import { useUser } from "@clerk/clerk-expo";
 import { Button, Heading, Body } from "@/components/common";
 import { ToggleTile } from "@/components/onboarding";
 import { OnboardingHeader } from "../../components/onboarding-header";
 import { colors, spacing } from "@/theme/colors";
+import { updateOnboardingField } from "@/services/onboarding";
 
 export default function AccessibilityScreen() {
   const router = useRouter();
+  const { user } = useUser();
+  const [isSaving, setIsSaving] = useState(false);
   const [textSize, setTextSize] = useState("Normal");
   const [voiceAssist, setVoiceAssist] = useState("Off");
   const [language, setLanguage] = useState("English");
+  const [selectedNeeds, setSelectedNeeds] = useState<string[]>([]);
+
+  const accessibilityNeeds = [
+    { id: "large-text", label: "Large Text" },
+    { id: "high-contrast", label: "High Contrast" },
+    { id: "screen-reader", label: "Screen Reader" },
+    { id: "voice-input", label: "Voice Input" },
+    { id: "closed-captions", label: "Closed Captions" },
+  ];
+
+  const toggleAccessibilityNeed = (id: string) => {
+    setSelectedNeeds((prev) =>
+      prev.includes(id) ? prev.filter((n) => n !== id) : [...prev, id]
+    );
+  };
 
   const payload = useMemo(
     () => ({
@@ -19,15 +38,30 @@ export default function AccessibilityScreen() {
         `Text size: ${textSize}`,
         `Voice assistance: ${voiceAssist}`,
         `Language: ${language}`,
+        `Accessibility needs: ${selectedNeeds.join(", ") || "None"}`,
       ],
       optionalNote: null,
     }),
-    [textSize, voiceAssist, language]
+    [textSize, voiceAssist, language, selectedNeeds]
   );
 
-  const handleContinue = () => {
-    console.log("Accessibility payload", payload);
-    router.push("/(onboarding)/health-context");
+  const handleContinue = async () => {
+    if (!user?.id) {
+      Alert.alert("Error", "User not authenticated");
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      console.log("Saving accessibility needs for user:", user.id);
+      await updateOnboardingField(user.id, "accessibilityNeeds", selectedNeeds);
+      console.log("Accessibility needs saved successfully");
+      router.push("/(onboarding)/health-context");
+    } catch (error) {
+      console.error("Error saving accessibility needs:", error);
+      Alert.alert("Error", "Failed to save accessibility preferences. Please try again.");
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -80,10 +114,24 @@ export default function AccessibilityScreen() {
             />
           ))}
         </View>
+
+        <Text style={styles.sectionLabel}>Accessibility Features</Text>
+        <Body style={styles.subtitle}>Select any features you need support with:</Body>
+        <View style={styles.stack}>
+          {accessibilityNeeds.map((need) => (
+            <ToggleTile
+              key={need.id}
+              title={need.label}
+              selected={selectedNeeds.includes(need.id)}
+              onPress={() => toggleAccessibilityNeed(need.id)}
+              accessibilityLabel={need.label}
+            />
+          ))}
+        </View>
         </ScrollView>
 
         <View style={styles.footer}>
-          <Button title="Continue" onPress={handleContinue} />
+          <Button title="Continue" onPress={handleContinue} disabled={isSaving} />
         </View>
       </LinearGradient>
     </SafeAreaView>
