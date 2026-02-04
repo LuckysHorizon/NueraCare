@@ -33,6 +33,7 @@ class SanityService:
     ) -> Dict[str, str]:
         report_id = str(uuid.uuid4())
         upload_date = datetime.utcnow().isoformat() + "Z"
+        print(f"🔍 store_report called: user_id={user_id}, can_use_sanity={self._can_use_sanity()}")
 
         record = {
             "report_id": report_id,
@@ -77,38 +78,54 @@ class SanityService:
                 "Content-Type": "application/json",
             }
             try:
+                print(f"📝 Saving report to Sanity: report_id={report_id}, user_id={user_id}")
                 with httpx.Client(timeout=10.0) as client:
-                    client.post(self._mutation_url(), json=payload, headers=headers)
-            except Exception:
-                pass
+                    response = client.post(self._mutation_url(), json=payload, headers=headers)
+                    response.raise_for_status()
+                print(f"✓ Report saved to Sanity successfully")
+            except Exception as e:
+                print(f"❌ Failed to save to Sanity: {type(e).__name__}: {str(e)}")
 
         self._store[report_id] = record
         return record
 
     def get_report(self, report_id: str, user_id: str) -> Optional[Dict[str, str]]:
+        print(f"🔍 get_report called: report_id={report_id}, user_id={user_id}")
+        
         record = self._store.get(report_id)
         if record and record.get("user_id") == user_id:
+            print(f"✓ Found in memory store")
             return record
 
         if not self._can_use_sanity():
+            print(f"⚠️ Sanity not configured, cannot query")
             return None
 
-        query = (
-            "*[_type == 'medicalReport' && reportId == $reportId && userId == $userId][0]"
-            "{reportId, userId, fileUrl, extractedText, uploadDate, reportType}"
-        )
-        params = {"query": query, "$reportId": report_id, "$userId": user_id}
+        # Use simpler query syntax - just query by reportId first
+        query = f'*[_type == "medicalReport" && reportId == "{report_id}" && userId == "{user_id}"][0]'
+        
         headers = {"Authorization": f"Bearer {self.token}"}
+        
+        print(f"📊 Querying Sanity: {query}")
 
         try:
+            # Construct the full URL manually
+            import urllib.parse
+            encoded_query = urllib.parse.quote(query)
+            url = f"{self._query_url()}?query={encoded_query}"
+            
             with httpx.Client(timeout=10.0) as client:
-                response = client.get(self._query_url(), params=params, headers=headers)
+                response = client.get(url, headers=headers)
                 response.raise_for_status()
-                data = response.json().get("result")
-        except Exception:
+                result = response.json()
+                print(f"✓ Query successful, response: {result}")
+                data = result.get("result")
+        except Exception as e:
+            print(f"❌ Sanity query failed: {type(e).__name__}: {str(e)}")
             return None
 
         if not data:
+            print(f"⚠️ No document found in Sanity")
             return None
 
         mapped = {
@@ -120,4 +137,5 @@ class SanityService:
             "report_type": data.get("reportType", ""),
         }
         self._store[report_id] = mapped
+        print(f"✓ Mapped data from Sanity and cached")
         return mapped

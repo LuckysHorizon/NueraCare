@@ -18,35 +18,43 @@ groq_service = GroqService()
 async def chat_with_report(payload: ChatRequest):
     """Chat with AI about an uploaded medical report with gentle, non-diagnostic explanations."""
     
-    # Validate inputs
-    if not payload.report_id or not payload.report_id.strip():
-        raise HTTPException(
-            status_code=400,
-            detail="Report ID is required."
-        )
-    
-    if not payload.user_id or not payload.user_id.strip():
-        raise HTTPException(
-            status_code=400,
-            detail="User ID is required."
-        )
-    
-    if not payload.message or not payload.message.strip():
-        raise HTTPException(
-            status_code=400,
-            detail="Message cannot be empty."
-        )
-    
-    # Validate mode
-    valid_modes = ["normal", "explain_simple"]
-    if payload.mode and payload.mode not in valid_modes:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Invalid mode. Must be one of: {', '.join(valid_modes)}"
-        )
+    print(f"🔍 DEBUG: Received chat request")
+    print(f"  - report_id={payload.report_id} (len={len(payload.report_id)})")
+    print(f"  - user_id={payload.user_id}")
+    print(f"  - message={payload.message[:50]}...")
     
     try:
+        # Validate inputs
+        if not payload.report_id or not payload.report_id.strip():
+            raise HTTPException(
+                status_code=400,
+                detail="Report ID is required."
+            )
+        
+        if not payload.user_id or not payload.user_id.strip():
+            raise HTTPException(
+                status_code=400,
+                detail="User ID is required."
+            )
+        
+        if not payload.message or not payload.message.strip():
+            raise HTTPException(
+                status_code=400,
+                detail="Message cannot be empty."
+            )
+        
+        # Validate mode
+        valid_modes = ["normal", "explain_simple"]
+        if payload.mode and payload.mode not in valid_modes:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid mode. Must be one of: {', '.join(valid_modes)}"
+            )
+        
+        print(f"✓ DEBUG: Validation passed, fetching report...")
         record = report_service.get_report(payload.report_id, payload.user_id)
+        print(f"✓ DEBUG: Report fetched - found={record is not None}")
+        
         if not record:
             raise HTTPException(
                 status_code=404,
@@ -110,6 +118,9 @@ async def chat_with_report(payload: ChatRequest):
     except HTTPException:
         raise
     except Exception as e:
+        print(f"❌ ERROR in chat_with_report: {type(e).__name__}: {str(e)}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(
             status_code=500,
             detail=f"Failed to generate response: {str(e)}"

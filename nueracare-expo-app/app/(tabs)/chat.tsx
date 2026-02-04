@@ -11,6 +11,7 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
+import Markdown from "react-native-markdown-display";
 import { Button, Body, Heading } from "@/components/common";
 import { colors, spacing, borderRadius } from "@/theme/colors";
 import { sendChatMessage } from "@/services/backend";
@@ -178,14 +179,40 @@ export default function ChatScreen() {
                 item.role === "user" ? styles.userBubble : styles.assistantBubble,
               ]}
             >
-              <Text
-                style={[
-                  styles.messageText,
-                  item.role === "user" && styles.userMessageText,
-                ]}
-              >
-                {item.text}
-              </Text>
+              {item.role === "assistant" ? (
+                <Markdown
+                  style={{
+                    body: [
+                      styles.messageText,
+                      styles.assistantMessageText,
+                    ],
+                    strong: {
+                      fontWeight: "700",
+                      color: colors.primary,
+                    },
+                    em: {
+                      fontStyle: "italic",
+                    },
+                    bullet_list: {
+                      marginLeft: spacing.md,
+                    },
+                    bullet_list_item: {
+                      marginBottom: spacing.xs,
+                    },
+                  }}
+                >
+                  {item.text}
+                </Markdown>
+              ) : (
+                <Text
+                  style={[
+                    styles.messageText,
+                    styles.userMessageText,
+                  ]}
+                >
+                  {item.text}
+                </Text>
+              )}
             </View>
           )}
           ListEmptyComponent={
@@ -346,6 +373,9 @@ const styles = StyleSheet.create({
     color: colors.gray900,
     fontSize: 14,
     lineHeight: 20,
+  },
+  assistantMessageText: {
+    color: colors.gray800,
   },
   userMessageText: {
     color: colors.white,

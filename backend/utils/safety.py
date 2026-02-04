@@ -71,7 +71,8 @@ def build_system_prompt(voice_mode: bool, explain_simple: bool) -> str:
         "2. Explain what the report shows in simple terms\n"
         "3. Provide context (if values are normal/abnormal range)\n"
         "4. End with a soft reminder to discuss with their doctor\n"
-        "5. Always maintain a supportive, non-alarming tone"
+        "5. Always maintain a supportive, non-alarming tone\n"
+        "\n⚠️ IMPORTANT: Do NOT use tables, markdown formatting, or complex layouts. Keep response as plain text only."
     )
     
     return (

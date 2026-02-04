@@ -97,7 +97,9 @@ class GroqService:
                 )
                 response.raise_for_status()
                 data = response.json()
-        except Exception:
+                print(f"✓ Groq API response received")
+        except Exception as e:
+            print(f"❌ Groq API failed: {type(e).__name__}: {str(e)}")
             return {
                 "response": build_fallback_response(parsed_values),
                 "model": None,
@@ -109,6 +111,8 @@ class GroqService:
             .get("content", "")
             .strip()
         )
+        
+        print(f"📝 Raw Groq response (first 200 chars): {content[:200]}")
 
         if not content:
             return {
@@ -116,4 +120,45 @@ class GroqService:
                 "model": None,
             }
 
-        return {"response": content, "model": self.model}
+        # Clean up the response: remove excessive newlines and format nicely
+        # Replace multiple newlines with double newlines (for paragraph breaks)
+        lines = content.split('\n')
+        cleaned_lines = []
+        prev_empty = False
+        skip_table = False
+        
+        for line in lines:
+            line = line.strip()
+            
+            # Skip markdown table lines (those with | or ---)
+            if line.startswith('|') or line.startswith('---') or line == '':
+                skip_table = True
+                if not prev_empty:
+                    cleaned_lines.append('')  # Add paragraph break
+                prev_empty = True
+                continue
+            
+            # If we encounter normal text again after table, resume
+            if skip_table and line and not line.startswith('|'):
+                skip_table = False
+            
+            if not line:
+                if not prev_empty:
+                    cleaned_lines.append('')  # Single empty line for paragraph break
+                prev_empty = True
+            else:
+                cleaned_lines.append(line)
+                prev_empty = False
+        
+        # Rejoin and limit to reasonable length
+        cleaned_response = '\n'.join(cleaned_lines).strip()
+        
+        # Remove excessive blank lines
+        while '\n\n\n' in cleaned_response:
+            cleaned_response = cleaned_response.replace('\n\n\n', '\n\n')
+        
+        if len(cleaned_response) > 1500:
+            cleaned_response = cleaned_response[:1500] + '...'
+
+        print(f"✓ Response cleaned and formatted")
+        return {"response": cleaned_response, "model": self.model}
