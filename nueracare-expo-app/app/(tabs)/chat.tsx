@@ -9,16 +9,28 @@ import {
   Platform,
   TouchableOpacity,
   ActivityIndicator,
+  ScrollView,
+  Modal,
+  Dimensions,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import Markdown from "react-native-markdown-display";
 import { Button, Body, Heading } from "@/components/common";
 import { colors, spacing, borderRadius } from "@/theme/colors";
-import { sendChatMessage } from "@/services/backend";
+import {
+  sendChatMessage,
+  fetchUserReports,
+  fetchChatHistory,
+  saveChat,
+  UserReport,
+  ChatMessage as BackendChatMessage,
+} from "@/services/backend";
 import { useUser } from "@clerk/clerk-expo";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { ChevronDown, RotateCcw } from "lucide-react-native";
 
 const LAST_REPORT_ID_KEY = "nueracare:lastReportId";
+const { width } = Dimensions.get("window");
 
 type Role = "user" | "assistant";
 
@@ -39,16 +51,22 @@ export default function ChatScreen() {
   const { user } = useUser();
   const [userId, setUserId] = useState("");
   const [reportId, setReportId] = useState("");
+  const [selectedReport, setSelectedReport] = useState<UserReport | null>(null);
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(false);
   const [voiceMode, setVoiceMode] = useState(false);
   const [explainSimple, setExplainSimple] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [reports, setReports] = useState<UserReport[]>([]);
+  const [loadingReports, setLoadingReports] = useState(false);
+  const [showReportSelector, setShowReportSelector] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
   useEffect(() => {
     if (user?.id) {
       setUserId(user.id);
+      loadUserReports(user.id);
     }
   }, [user?.id]);
 
@@ -57,10 +75,87 @@ export default function ChatScreen() {
       const stored = await AsyncStorage.getItem(LAST_REPORT_ID_KEY);
       if (stored) {
         setReportId(stored);
+        // Load the report details
+        const report = reports.find(r => r.reportId === stored);
+        if (report) {
+          setSelectedReport(report);
+          await loadChatHistory(stored);
+        }
       }
     };
-    loadLastReportId();
-  }, []);
+    if (reports.length > 0) {
+      loadLastReportId();
+    }
+  }, [reports]);
+
+  const loadUserReports = async (uid: string) => {
+    setLoadingReports(true);
+    try {
+      const fetchedReports = await fetchUserReports(uid);
+      setReports(fetchedReports);
+    } catch (err) {
+      console.error("Error loading reports:", err);
+    } finally {
+      setLoadingReports(false);
+    }
+  };
+
+  const loadChatHistory = async (rId: string) => {
+    try {
+      const history = await fetchChatHistory(rId, userId);
+      if (history && history.length > 0) {
+        // Convert backend messages to chat messages
+        const chatMsgs: ChatMessage[] = history.map((msg, idx) => ({
+          id: `history-${idx}`,
+          role: msg.role as Role,
+          text: msg.text,
+          timestamp: msg.timestamp || new Date().toISOString(),
+        }));
+        setMessages(chatMsgs);
+        setHasUnsavedChanges(false);
+      } else {
+        setMessages([]);
+      }
+    } catch (err) {
+      console.error("Error loading chat history:", err);
+      setMessages([]);
+    }
+  };
+
+  const handleSelectReport = async (report: UserReport) => {
+    // Save current chat if there are changes
+    if (hasUnsavedChanges && messages.length > 0 && reportId) {
+      await saveCurrentChat();
+    }
+
+    setReportId(report.reportId);
+    setSelectedReport(report);
+    setShowReportSelector(false);
+    await AsyncStorage.setItem(LAST_REPORT_ID_KEY, report.reportId);
+    await loadChatHistory(report.reportId);
+  };
+
+  const saveCurrentChat = async () => {
+    if (!reportId || !userId || messages.length === 0) return;
+    
+    try {
+      const backendMessages: BackendChatMessage[] = messages.map(m => ({
+        role: m.role,
+        text: m.text,
+        timestamp: m.timestamp,
+      }));
+      
+      const summary = messages
+        .filter(m => m.role === "assistant")
+        .slice(-1)
+        .map(m => m.text.substring(0, 100))[0] || "";
+      
+      await saveChat(reportId, userId, backendMessages, summary);
+      setHasUnsavedChanges(false);
+    } catch (err) {
+      console.error("Error saving chat:", err);
+    }
+  };
 
   const canSend = useMemo(
     () => Boolean(userId.trim() && reportId.trim() && message.trim()),
@@ -77,6 +172,7 @@ export default function ChatScreen() {
       },
       ...prev,
     ]);
+    setHasUnsavedChanges(true);
   };
 
   const handleSend = async (overrideText?: string) => {
@@ -109,64 +205,143 @@ export default function ChatScreen() {
     }
   };
 
+  const handleClearChat = () => {
+    setMessages([]);
+    setHasUnsavedChanges(false);
+  };
+
   return (
     <LinearGradient colors={["#F5FCFB", "#FFFFFF"]} style={styles.container}>
       <KeyboardAvoidingView
         style={styles.container}
         behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
+        {/* Header */}
         <View style={styles.header}>
-          <Heading level={3} style={styles.title}>Report Chatbot</Heading>
+          <Heading level={2} style={styles.title}>Report Chat</Heading>
           <Body style={styles.subtitle}>
-            Gentle explanations based on your uploaded report only.
+            Ask about your medical report - get gentle, caring explanations
           </Body>
         </View>
 
-        <View style={styles.contextCard}>
-          <Text style={styles.sectionLabel}>Session</Text>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Signed-in user</Text>
-            <Text style={styles.infoValue}>{userId || "Not available"}</Text>
-          </View>
-          <TextInput
-            placeholder="Report ID"
-            value={reportId}
-            onChangeText={setReportId}
-            style={styles.input}
-            placeholderTextColor={colors.gray400}
-          />
+        {/* Report Selector */}
+        <View style={styles.reportSelectorWrapper}>
+          <TouchableOpacity
+            style={styles.reportButton}
+            onPress={() => setShowReportSelector(!showReportSelector)}
+          >
+            <View style={styles.reportButtonContent}>
+              <View style={styles.reportButtonLeft}>
+                <Text style={styles.reportButtonLabel}>
+                  {selectedReport 
+                    ? (selectedReport.label || `Report ${selectedReport.reportId.substring(0, 8)}...`) 
+                    : "Select a Report"}
+                </Text>
+                {selectedReport && (
+                  <Text style={styles.reportButtonDate}>
+                    {new Date(selectedReport.uploadDate).toLocaleDateString()}
+                  </Text>
+                )}
+              </View>
+              <ChevronDown size={20} color={colors.primary} />
+            </View>
+          </TouchableOpacity>
+
+          {/* Report Selector Modal */}
+          {showReportSelector && (
+            <View style={styles.reportSelectorDropdown}>
+              {loadingReports ? (
+                <View style={styles.centerContainer}>
+                  <ActivityIndicator color={colors.primary} size="small" />
+                </View>
+              ) : reports.length === 0 ? (
+                <Text style={styles.emptyText}>No reports available</Text>
+              ) : (
+                <ScrollView style={styles.reportList}>
+                  {reports.map((report) => (
+                    <TouchableOpacity
+                      key={report.reportId}
+                      style={[
+                        styles.reportOption,
+                        selectedReport?.reportId === report.reportId &&
+                          styles.reportOptionActive,
+                      ]}
+                      onPress={() => handleSelectReport(report)}
+                    >
+                      <View>
+                        <Text style={styles.reportOptionLabel}>
+                          {report.label || `Report ${report.reportId.substring(0, 8)}...`}
+                        </Text>
+                        <Text style={styles.reportOptionDate}>
+                          {new Date(report.uploadDate).toLocaleDateString()}
+                        </Text>
+                      </View>
+                      {selectedReport?.reportId === report.reportId && (
+                        <View style={styles.checkmark}>
+                          <Text style={styles.checkmarkText}>✓</Text>
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              )}
+            </View>
+          )}
+        </View>
+
+        {/* Chat Controls */}
+        <View style={styles.controlsCard}>
           <View style={styles.toggleRow}>
             <TouchableOpacity
               style={[styles.toggleChip, voiceMode && styles.toggleChipActive]}
               onPress={() => setVoiceMode((prev) => !prev)}
             >
-              <Text style={[styles.toggleText, voiceMode && styles.toggleTextActive]}>
-                Voice mode
+              <Text
+                style={[
+                  styles.toggleText,
+                  voiceMode && styles.toggleTextActive,
+                ]}
+              >
+                🎙️ Voice
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.toggleChip, explainSimple && styles.toggleChipActive]}
               onPress={() => setExplainSimple((prev) => !prev)}
             >
-              <Text style={[styles.toggleText, explainSimple && styles.toggleTextActive]}>
-                Explain simpler
+              <Text
+                style={[
+                  styles.toggleText,
+                  explainSimple && styles.toggleTextActive,
+                ]}
+              >
+                ✨ Simple
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.toggleChip}
+              onPress={handleClearChat}
+            >
+              <Text style={styles.toggleText}>
+                <RotateCcw size={14} color={colors.gray600} /> Clear
               </Text>
             </TouchableOpacity>
           </View>
+
+          <View style={styles.quickPrompts}>
+            {QUICK_PROMPTS.map((prompt) => (
+              <TouchableOpacity
+                key={prompt}
+                style={styles.promptChip}
+                onPress={() => handleSend(prompt)}
+              >
+                <Text style={styles.promptText}>{prompt}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
         </View>
 
-        <View style={styles.quickPrompts}>
-          {QUICK_PROMPTS.map((prompt) => (
-            <TouchableOpacity
-              key={prompt}
-              style={styles.promptChip}
-              onPress={() => handleSend(prompt)}
-            >
-              <Text style={styles.promptText}>{prompt}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
+        {/* Messages */}
         <FlatList
           data={messages}
           keyExtractor={(item) => item.id}
@@ -217,16 +392,23 @@ export default function ChatScreen() {
           )}
           ListEmptyComponent={
             <View style={styles.emptyState}>
-              <Text style={styles.emptyTitle}>Start a gentle chat</Text>
+              <Text style={styles.emptyTitle}>Start your conversation</Text>
               <Text style={styles.emptySubtitle}>
-                Select a report in the Reports tab to auto-fill the report ID.
+                {reportId
+                  ? "Ask a question about your selected report above."
+                  : "Select a report to begin chatting."}
               </Text>
             </View>
           }
         />
 
-        {error ? <Text style={styles.errorText}>{error}</Text> : null}
+        {error && (
+          <View style={styles.errorContainer}>
+            <Text style={styles.errorText}>❌ {error}</Text>
+          </View>
+        )}
 
+        {/* Input Area */}
         <View style={styles.inputRow}>
           <TextInput
             placeholder="Ask about your report…"
@@ -235,17 +417,30 @@ export default function ChatScreen() {
             style={styles.messageInput}
             placeholderTextColor={colors.gray400}
             multiline
+            editable={!!reportId}
           />
           <View style={styles.sendButtonWrapper}>
             {loading ? (
               <View style={styles.loadingButton}>
-                <ActivityIndicator color={colors.primary} />
+                <ActivityIndicator color={colors.primary} size="small" />
               </View>
             ) : (
-              <Button title="Send" onPress={() => handleSend()} disabled={!canSend} />
+              <Button
+                title="Send"
+                onPress={() => handleSend()}
+                disabled={!canSend}
+              />
             )}
           </View>
         </View>
+
+        {hasUnsavedChanges && (
+          <View style={styles.autoSaveNotice}>
+            <Text style={styles.autoSaveText}>
+              💾 Chat will be saved automatically
+            </Text>
+          </View>
+        )}
       </KeyboardAvoidingView>
     </LinearGradient>
   );
@@ -264,46 +459,91 @@ const styles = StyleSheet.create({
   subtitle: {
     color: colors.gray600,
   },
-  contextCard: {
+
+  // Report Selector
+  reportSelectorWrapper: {
     marginHorizontal: spacing.lg,
-    padding: spacing.lg,
-    backgroundColor: colors.white,
-    borderRadius: borderRadius.lg,
-    borderWidth: 1,
-    borderColor: colors.gray200,
-    gap: spacing.sm,
+    marginBottom: spacing.md,
   },
-  sectionLabel: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: colors.gray500,
-    textTransform: "uppercase",
-    letterSpacing: 0.6,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: colors.gray200,
-    borderRadius: borderRadius.md,
+  reportButton: {
     paddingHorizontal: spacing.md,
-    paddingVertical: Platform.OS === "ios" ? spacing.md : spacing.sm,
-    fontSize: 14,
-    color: colors.gray900,
-    backgroundColor: colors.gray50,
+    paddingVertical: spacing.md,
+    backgroundColor: colors.white,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.primary200,
   },
-  infoRow: {
+  reportButtonContent: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
-    paddingVertical: spacing.xs,
+    justifyContent: "space-between",
   },
-  infoLabel: {
-    fontSize: 13,
-    color: colors.gray600,
+  reportButtonLeft: {
+    flex: 1,
   },
-  infoValue: {
-    fontSize: 13,
-    color: colors.gray900,
+  reportButtonLabel: {
+    fontSize: 14,
     fontWeight: "600",
+    color: colors.gray900,
+  },
+  reportButtonDate: {
+    fontSize: 12,
+    color: colors.gray500,
+    marginTop: spacing.xs,
+  },
+  reportSelectorDropdown: {
+    backgroundColor: colors.white,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.gray200,
+    marginTop: spacing.sm,
+    maxHeight: 300,
+    paddingVertical: spacing.sm,
+  },
+  reportList: {
+    maxHeight: 300,
+  },
+  reportOption: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.gray100,
+  },
+  reportOptionActive: {
+    backgroundColor: colors.primary50,
+  },
+  reportOptionLabel: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: colors.gray900,
+  },
+  reportOptionDate: {
+    fontSize: 12,
+    color: colors.gray500,
+    marginTop: spacing.xs,
+  },
+  checkmark: {
+    marginLeft: "auto",
+    paddingHorizontal: spacing.sm,
+  },
+  checkmarkText: {
+    color: colors.primary700,
+    fontSize: 16,
+    fontWeight: "bold",
+  },
+
+  // Controls Card
+  controlsCard: {
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.md,
+    padding: spacing.md,
+    backgroundColor: colors.white,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.gray200,
+    gap: spacing.md,
   },
   toggleRow: {
     flexDirection: "row",
@@ -334,8 +574,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: spacing.sm,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
   },
   promptChip: {
     paddingVertical: spacing.xs,
@@ -348,6 +586,8 @@ const styles = StyleSheet.create({
     color: colors.gray700,
     fontWeight: "600",
   },
+
+  // Messages
   messages: {
     paddingHorizontal: spacing.lg,
     paddingBottom: spacing.md,
@@ -395,41 +635,74 @@ const styles = StyleSheet.create({
     color: colors.gray500,
     textAlign: "center",
   },
-  errorText: {
-    color: colors.error,
-    fontSize: 12,
+  emptyText: {
+    fontSize: 13,
+    color: colors.gray500,
     textAlign: "center",
+    padding: spacing.md,
+  },
+  centerContainer: {
+    padding: spacing.md,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  // Error & Messages
+  errorContainer: {
+    backgroundColor: colors.error50,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    marginHorizontal: spacing.lg,
+    borderRadius: borderRadius.md,
     marginBottom: spacing.sm,
   },
+  errorText: {
+    color: colors.error700,
+    fontSize: 12,
+  },
+
+  // Input Area
   inputRow: {
     flexDirection: "row",
-    alignItems: "flex-end",
     gap: spacing.sm,
     paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.lg,
+    paddingVertical: spacing.md,
+    backgroundColor: colors.white,
+    borderTopWidth: 1,
+    borderTopColor: colors.gray100,
   },
   messageInput: {
     flex: 1,
-    minHeight: 48,
-    maxHeight: 120,
     borderWidth: 1,
     borderColor: colors.gray200,
-    borderRadius: borderRadius.lg,
+    borderRadius: borderRadius.md,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
-    backgroundColor: colors.white,
+    fontSize: 14,
     color: colors.gray900,
+    backgroundColor: colors.gray50,
+    maxHeight: 100,
   },
   sendButtonWrapper: {
-    minWidth: 88,
+    justifyContent: "center",
   },
   loadingButton: {
-    height: 48,
-    borderRadius: borderRadius.lg,
-    borderWidth: 1,
-    borderColor: colors.gray200,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: colors.white,
+  },
+
+  // Auto-save Notice
+  autoSaveNotice: {
+    backgroundColor: colors.success50,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    alignItems: "center",
+  },
+  autoSaveText: {
+    fontSize: 12,
+    color: colors.success700,
+    fontWeight: "600",
   },
 });

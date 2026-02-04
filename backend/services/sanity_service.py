@@ -30,6 +30,7 @@ class SanityService:
         file_url: Optional[str],
         extracted_text: str,
         report_type: Optional[str],
+        label: Optional[str] = None,
     ) -> Dict[str, str]:
         report_id = str(uuid.uuid4())
         upload_date = datetime.utcnow().isoformat() + "Z"
@@ -42,6 +43,7 @@ class SanityService:
             "extracted_text": extracted_text,
             "upload_date": upload_date,
             "report_type": report_type or "",
+            "label": label or "",
         }
 
         if self._can_use_sanity():
@@ -67,6 +69,7 @@ class SanityService:
                 "extractedText": extracted_text,
                 "uploadDate": upload_date,
                 "reportType": report_type,
+                "label": label,
             }
             if existing_id:
                 doc["_id"] = existing_id
@@ -135,7 +138,107 @@ class SanityService:
             "extracted_text": data.get("extractedText", ""),
             "upload_date": data.get("uploadDate", ""),
             "report_type": data.get("reportType", ""),
+            "label": data.get("label", ""),
         }
         self._store[report_id] = mapped
         print(f"✓ Mapped data from Sanity and cached")
         return mapped
+
+    def get_user_reports(self, user_id: str) -> list:
+        """Fetch all reports for a user from Sanity."""
+        if not self._can_use_sanity():
+            return []
+
+        query = f'*[_type == "medicalReport" && userId == "{user_id}"] | order(uploadDate desc) {{_id, reportId, userId, label, reportType, uploadDate, extractedText, fileUrl}}'
+        
+        headers = {"Authorization": f"Bearer {self.token}"}
+        
+        print(f"📊 Querying user reports: userId={user_id}")
+
+        try:
+            import urllib.parse
+            encoded_query = urllib.parse.quote(query)
+            url = f"{self._query_url()}?query={encoded_query}"
+            
+            print(f"🔍 Encoded query: {encoded_query}")
+            
+            with httpx.Client(timeout=10.0) as client:
+                response = client.get(url, headers=headers)
+                response.raise_for_status()
+                result = response.json()
+                reports = result.get("result", [])
+                print(f"✓ Found {len(reports)} reports for user")
+                if reports:
+                    print(f"📄 Sample report data: {reports[0]}")
+                return reports
+        except Exception as e:
+            print(f"❌ Failed to fetch reports: {type(e).__name__}: {str(e)}")
+            return []
+
+    def save_chat(self, report_id: str, user_id: str, messages: list, summary: str = "") -> bool:
+        """Save chat conversation to Sanity."""
+        if not self._can_use_sanity():
+            return False
+
+        import urllib.parse
+        # Convert messages to Sanity format
+        sanity_messages = [
+            {
+                "role": msg.get("role", ""),
+                "text": msg.get("text", ""),
+                "timestamp": msg.get("timestamp", datetime.utcnow().isoformat() + "Z"),
+            }
+            for msg in messages
+        ]
+
+        doc = {
+            "_type": "chatConversation",
+            "reportId": report_id,
+            "userId": user_id,
+            "messages": sanity_messages,
+            "summary": summary,
+            "createdAt": datetime.utcnow().isoformat() + "Z",
+            "updatedAt": datetime.utcnow().isoformat() + "Z",
+        }
+
+        payload = {"mutations": [{"create": doc}]}
+        headers = {
+            "Authorization": f"Bearer {self.token}",
+            "Content-Type": "application/json",
+        }
+
+        try:
+            print(f"💾 Saving chat to Sanity: report_id={report_id}")
+            with httpx.Client(timeout=10.0) as client:
+                response = client.post(self._mutation_url(), json=payload, headers=headers)
+                response.raise_for_status()
+            print(f"✓ Chat saved to Sanity successfully")
+            return True
+        except Exception as e:
+            print(f"❌ Failed to save chat: {type(e).__name__}: {str(e)}")
+            return False
+
+    def get_chat_history(self, report_id: str, user_id: str) -> Optional[Dict]:
+        """Fetch chat history for a report."""
+        if not self._can_use_sanity():
+            return None
+
+        query = f'*[_type == "chatConversation" && reportId == "{report_id}" && userId == "{user_id}"][0]'
+        
+        headers = {"Authorization": f"Bearer {self.token}"}
+
+        try:
+            import urllib.parse
+            encoded_query = urllib.parse.quote(query)
+            url = f"{self._query_url()}?query={encoded_query}"
+            
+            with httpx.Client(timeout=10.0) as client:
+                response = client.get(url, headers=headers)
+                response.raise_for_status()
+                result = response.json().get("result")
+                if result:
+                    print(f"✓ Found chat history for report")
+                return result
+        except Exception as e:
+            print(f"⚠️ Failed to fetch chat history: {type(e).__name__}")
+            return None

@@ -125,3 +125,64 @@ async def chat_with_report(payload: ChatRequest):
             status_code=500,
             detail=f"Failed to generate response: {str(e)}"
         )
+
+@router.post("/save-chat")
+async def save_chat(
+    report_id: str,
+    user_id: str,
+    messages: list,
+    summary: str = "",
+):
+    """Save chat conversation to Sanity."""
+    if not report_id or not user_id or not messages:
+        raise HTTPException(
+            status_code=400,
+            detail="report_id, user_id, and messages are required."
+        )
+    
+    try:
+        success = report_service.save_chat(
+            report_id=report_id.strip(),
+            user_id=user_id.strip(),
+            messages=messages,
+            summary=summary,
+        )
+        
+        if success:
+            return {"status": "saved", "report_id": report_id}
+        else:
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to save chat to Sanity"
+            )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to save chat: {str(e)}"
+        )
+
+
+@router.get("/chat-history/{report_id}/{user_id}")
+async def get_chat_history(report_id: str, user_id: str):
+    """Fetch chat history for a report."""
+    if not report_id or not user_id:
+        raise HTTPException(
+            status_code=400,
+            detail="report_id and user_id are required."
+        )
+    
+    try:
+        chat = report_service.get_chat_history(
+            report_id=report_id.strip(),
+            user_id=user_id.strip(),
+        )
+        
+        if chat:
+            return {"status": "found", "chat": chat}
+        else:
+            return {"status": "not_found", "chat": None}
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to fetch chat history: {str(e)}"
+        )

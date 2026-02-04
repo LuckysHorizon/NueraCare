@@ -23,6 +23,7 @@ export interface ErrorResponse {
 export interface UploadReportPayload {
   userId: string;
   reportType?: string;
+  label?: string;
   file: {
     uri: string;
     name: string;
@@ -158,6 +159,9 @@ export async function uploadMedicalReport(
   if (payload.reportType?.trim()) {
     formData.append("report_type", payload.reportType.trim());
   }
+  if (payload.label?.trim()) {
+    formData.append("label", payload.label.trim());
+  }
 
   formData.append("file", {
     uri: payload.file.uri,
@@ -192,5 +196,97 @@ export async function uploadMedicalReport(
       throw error;
     }
     throw new Error("An unexpected error occurred while uploading the report");
+  }
+}
+export interface UserReport {
+  _id: string;
+  reportId: string;
+  userId: string;
+  label?: string;
+  reportType?: string;
+  uploadDate: string;
+  extractedText?: string;
+}
+
+export interface ChatMessage {
+  role: "user" | "assistant";
+  text: string;
+  timestamp: string;
+}
+
+export async function fetchUserReports(userId: string): Promise<UserReport[]> {
+  const baseUrl = getBackendBaseUrl();
+  const endpoint = `/api/user-reports/${userId}`;
+
+  try {
+    console.log(`📊 Fetching reports for user: ${userId}`);
+    const response = await fetch(`${baseUrl}${endpoint}`, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch reports: ${response.status}`);
+    }
+
+    const data = (await response.json()) as { reports: UserReport[] };
+    console.log(`✓ Fetched ${data.reports?.length || 0} reports:`, data.reports);
+    return data.reports || [];
+  } catch (error) {
+    console.error("Error fetching user reports:", error);
+    return [];
+  }
+}
+
+export async function saveChat(
+  reportId: string,
+  userId: string,
+  messages: ChatMessage[],
+  summary: string = ""
+): Promise<boolean> {
+  const baseUrl = getBackendBaseUrl();
+  const endpoint = "/api/save-chat";
+
+  try {
+    const response = await fetch(`${baseUrl}${endpoint}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        report_id: reportId,
+        user_id: userId,
+        messages,
+        summary,
+      }),
+    });
+
+    return response.ok;
+  } catch (error) {
+    console.error("Error saving chat:", error);
+    return false;
+  }
+}
+
+export async function fetchChatHistory(
+  reportId: string,
+  userId: string
+): Promise<ChatMessage[] | null> {
+  const baseUrl = getBackendBaseUrl();
+  const endpoint = `/api/chat-history/${reportId}/${userId}`;
+
+  try {
+    const response = await fetch(`${baseUrl}${endpoint}`, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" },
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const data = (await response.json()) as { chat?: { messages?: ChatMessage[] } };
+    return data.chat?.messages || null;
+  } catch (error) {
+    console.error("Error fetching chat history:", error);
+    return null;
   }
 }

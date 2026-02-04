@@ -53,6 +53,12 @@ export default defineType({
       },
     }),
     defineField({
+      name: "label",
+      title: "Report Label",
+      type: "string",
+      description: "Custom label for organizing reports (e.g., 'Annual Checkup', 'Follow-up')",
+    }),
+    defineField({
       name: "clerkId",
       title: "Clerk User ID (Deprecated)",
       type: "string",

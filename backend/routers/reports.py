@@ -21,6 +21,7 @@ UPLOAD_DIR = os.path.join(os.path.dirname(__file__), "..", "uploads")
 async def upload_report(
     user_id: str = Form(...),
     report_type: str = Form(None),
+    label: str = Form(None),
     file: UploadFile = File(...),
 ):
     """Upload and process a medical report (PDF, image, or text file)."""
@@ -79,6 +80,7 @@ async def upload_report(
             file_url=file_path,
             extracted_text=extracted_text,
             report_type=report_type,
+            label=label.strip() if label else None,
         )
 
         return UploadReportResponse(
@@ -140,3 +142,24 @@ async def parse_report(payload: ParseReportRequest):
             status_code=500,
             detail=f"Failed to parse report: {str(e)}"
         )
+
+
+@router.get("/user-reports/{user_id}")
+async def get_user_reports(user_id: str):
+    """Fetch all reports for a user."""
+    if not user_id or not user_id.strip():
+        raise HTTPException(status_code=400, detail="User ID is required.")
+    
+    try:
+        reports = service.get_user_reports(user_id.strip())
+        return {
+            "user_id": user_id,
+            "reports": reports,
+            "total": len(reports),
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to fetch reports: {str(e)}"
+        )
+
