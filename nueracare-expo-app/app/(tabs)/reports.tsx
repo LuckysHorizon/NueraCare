@@ -11,9 +11,13 @@ import {
   FlatList,
   Alert,
   Dimensions,
+  LayoutAnimation,
+  UIManager,
 } from "react-native";
 import * as DocumentPicker from "expo-document-picker";
+import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
+import { BlurView } from "expo-blur";
 import { Button, Body, Heading, Card } from "@/components/common";
 import { borderRadius, colors, spacing } from "@/theme/colors";
 import { useUser } from "@clerk/clerk-expo";
@@ -24,10 +28,24 @@ import {
   fetchUserReports,
   UserReport,
 } from "@/services/backend";
-import { ChevronRight, Plus, Trash2 } from "lucide-react-native";
+import { 
+  ChevronRight, 
+  Plus, 
+  Trash2, 
+  CloudUpload,
+  FileText,
+  Activity,
+  Search,
+  ChevronLeft,
+} from "lucide-react-native";
 
 const LAST_REPORT_ID_KEY = "nueracare:lastReportId";
 const { width } = Dimensions.get("window");
+
+// Enable LayoutAnimation on Android
+if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 export default function ReportsScreen() {
   const { user } = useUser();
@@ -69,6 +87,7 @@ export default function ReportsScreen() {
 
   const handlePickFile = async () => {
     setError(null);
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     const response = await DocumentPicker.getDocumentAsync({
       type: ["application/pdf", "image/*", "text/*"],
       copyToCacheDirectory: true,
@@ -81,10 +100,13 @@ export default function ReportsScreen() {
 
     const asset = response.assets?.[0];
     setSelectedFile(asset);
+    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   };
 
   const handleUpload = async () => {
     if (!canUpload || !selectedFile) return;
+    
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setUploading(true);
     setError(null);
     setSuccess(null);
@@ -102,6 +124,7 @@ export default function ReportsScreen() {
       });
 
       setSuccess(`Report uploaded successfully!`);
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       await AsyncStorage.setItem(LAST_REPORT_ID_KEY, uploadResult.report_id);
       
       // Reset form
@@ -109,21 +132,25 @@ export default function ReportsScreen() {
       setReportType("");
       setSelectedFile(undefined);
       
-      // Reload reports
+      // Reload reports with animation
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
       await loadUserReports(userId);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Upload failed.");
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     } finally {
       setUploading(false);
     }
   };
 
   const handleSelectReport = async (report: UserReport) => {
+    await Haptics.selectionAsync();
     await AsyncStorage.setItem(LAST_REPORT_ID_KEY, report.reportId);
     // Navigate to chat is handled by tab navigation
   };
 
   const handleDeleteReport = async (reportId: string) => {
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     Alert.alert(
       "Delete Report",
       "Are you sure you want to delete this report? This action cannot be undone.",
@@ -133,8 +160,9 @@ export default function ReportsScreen() {
           text: "Delete",
           style: "destructive",
           onPress: async () => {
-            // TODO: Implement delete endpoint
+            LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
             setReports(reports.filter(r => r.reportId !== reportId));
+            await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
           },
         },
       ]
@@ -142,88 +170,140 @@ export default function ReportsScreen() {
   };
 
   return (
-    <LinearGradient colors={["#F5FCFB", "#FFFFFF"]} style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        {/* Header */}
-        <View style={styles.header}>
-          <Heading level={2} style={styles.title}>
-            Medical Reports
-          </Heading>
-          <Body style={styles.subtitle}>
-            Upload and organize your medical reports
-          </Body>
+    <View style={styles.container}>
+      {/* Glassmorphic Header */}
+      <BlurView intensity={80} tint="light" style={styles.header}>
+        <View style={styles.headerContent}>
+          <TouchableOpacity style={styles.backButton}>
+            <ChevronLeft size={24} color="#1C1C1E" strokeWidth={2} />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Medical Reports</Text>
+          <TouchableOpacity style={styles.searchButton}>
+            <Search size={20} color="#1C1C1E" strokeWidth={1.5} />
+          </TouchableOpacity>
         </View>
+      </BlurView>
 
-        {/* Upload Section */}
-        <View style={styles.uploadCard}>
-          <View style={styles.uploadHeader}>
-            <Plus size={20} color={colors.primary} />
-            <Text style={styles.uploadTitle}>Upload New Report</Text>
+      <ScrollView 
+        contentContainerStyle={styles.scrollContent} 
+        showsVerticalScrollIndicator={false}
+        style={styles.scrollView}
+      >
+        {/* Hero Upload Card with Gradient */}
+        <LinearGradient
+          colors={["#E0F2FE", "#FFFFFF"]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.heroCard}
+        >
+          <View style={styles.uploadIconContainer}>
+            <CloudUpload size={44} color="#007AFF" strokeWidth={1.5} />
           </View>
-
+          
+          <Text style={styles.heroTitle}>Upload New Report</Text>
+          
           <TextInput
             placeholder="Add a label (e.g., Annual Checkup)"
             value={reportLabel}
             onChangeText={setReportLabel}
-            style={styles.input}
-            placeholderTextColor={colors.gray400}
+            style={styles.labelInput}
+            placeholderTextColor="#8E8E93"
           />
 
-          <View style={styles.reportTypeSelector}>
+          {/* Quick Tags */}
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.quickTagsContainer}
+          >
             {["Blood Test", "X-Ray", "ECG", "Other"].map((type) => (
               <TouchableOpacity
                 key={type}
                 style={[
-                  styles.typeChip,
-                  reportType === type && styles.typeChipActive,
+                  styles.quickTag,
+                  reportType === type && styles.quickTagActive,
                 ]}
-                onPress={() => setReportType(type)}
+                onPress={async () => {
+                  await Haptics.selectionAsync();
+                  setReportType(type);
+                }}
               >
                 <Text
                   style={[
-                    styles.typeChipText,
-                    reportType === type && styles.typeChipTextActive,
+                    styles.quickTagText,
+                    reportType === type && styles.quickTagTextActive,
                   ]}
                 >
                   {type}
                 </Text>
               </TouchableOpacity>
             ))}
-          </View>
+          </ScrollView>
 
+          {/* File Picker Button */}
           <TouchableOpacity
-            style={[styles.fileButton, selectedFile && styles.fileButtonActive]}
+            style={[styles.filePickerButton, selectedFile && styles.filePickerButtonActive]}
             onPress={handlePickFile}
           >
-            <Text style={styles.fileButtonText}>
-              {selectedFile ? `📄 ${selectedFile.name}` : "Select PDF or Image"}
+            <FileText 
+              size={18} 
+              color={selectedFile ? "#007AFF" : "#8E8E93"} 
+              strokeWidth={1.5} 
+            />
+            <Text style={[
+              styles.filePickerText,
+              selectedFile && styles.filePickerTextActive
+            ]}>
+              {selectedFile ? selectedFile.name : "Select PDF or Image"}
             </Text>
           </TouchableOpacity>
 
-          {error && <Text style={styles.errorText}>❌ {error}</Text>}
-          {success && <Text style={styles.successText}>✅ {success}</Text>}
+          {/* Status Messages */}
+          {error && (
+            <View style={styles.errorContainer}>
+              <Text style={styles.errorText}>⚠️ {error}</Text>
+            </View>
+          )}
+          {success && (
+            <View style={styles.successContainer}>
+              <Text style={styles.successText}>✓ {success}</Text>
+            </View>
+          )}
 
-          <Button
-            title={uploading ? "Uploading..." : "Upload Report"}
+          {/* Upload CTA */}
+          <TouchableOpacity
+            style={[styles.uploadButton, (!canUpload || uploading) && styles.uploadButtonDisabled]}
             onPress={handleUpload}
             disabled={!canUpload || uploading}
-          />
-        </View>
+          >
+            <LinearGradient
+              colors={canUpload && !uploading ? ["#34C759", "#30D158"] : ["#C7C7CC", "#C7C7CC"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.uploadButtonGradient}
+            >
+              {uploading ? (
+                <ActivityIndicator color="#FFFFFF" />
+              ) : (
+                <Text style={styles.uploadButtonText}>
+                  {uploading ? "Uploading..." : "Upload Report"}
+                </Text>
+              )}
+            </LinearGradient>
+          </TouchableOpacity>
+        </LinearGradient>
 
-        {/* Reports List */}
+        {/* Reports List Section */}
         <View style={styles.reportsSection}>
-          <View style={styles.sectionHeader}>
-            <Heading level={4} style={styles.sectionTitle}>
-              Your Reports ({reports.length})
-            </Heading>
-          </View>
+          <Text style={styles.sectionHeader}>Your Reports</Text>
 
           {loadingReports ? (
-            <View style={styles.centerContainer}>
-              <ActivityIndicator color={colors.primary} size="large" />
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator color="#007AFF" size="large" />
             </View>
           ) : reports.length === 0 ? (
             <View style={styles.emptyState}>
+              <Activity size={48} color="#C7C7CC" strokeWidth={1.5} />
               <Text style={styles.emptyText}>No reports yet</Text>
               <Text style={styles.emptySubtext}>
                 Upload your first medical report to get started
@@ -241,12 +321,12 @@ export default function ReportsScreen() {
                   onDelete={handleDeleteReport}
                 />
               )}
-              ItemSeparatorComponent={() => <View style={styles.separator} />}
+              ItemSeparatorComponent={() => <View style={styles.cardSeparator} />}
             />
           )}
         </View>
       </ScrollView>
-    </LinearGradient>
+    </View>
   );
 }
 
@@ -259,246 +339,383 @@ const ReportCard = ({
   onSelect: (report: UserReport) => void;
   onDelete: (id: string) => void;
 }) => {
-  const uploadDate = new Date(report.uploadDate).toLocaleDateString();
+  const uploadDate = new Date(report.uploadDate).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+
+  const getIconColor = (type?: string) => {
+    switch (type?.toLowerCase()) {
+      case "blood test":
+        return "#FF3B30";
+      case "x-ray":
+        return "#007AFF";
+      case "ecg":
+        return "#34C759";
+      default:
+        return "#8E8E93";
+    }
+  };
+
+  const getBadgeColor = (type?: string) => {
+    switch (type?.toLowerCase()) {
+      case "blood test":
+        return { bg: "rgba(255, 59, 48, 0.1)", text: "#FF3B30" };
+      case "x-ray":
+        return { bg: "rgba(0, 122, 255, 0.1)", text: "#007AFF" };
+      case "ecg":
+        return { bg: "rgba(52, 199, 89, 0.1)", text: "#34C759" };
+      default:
+        return { bg: "rgba(142, 142, 147, 0.1)", text: "#8E8E93" };
+    }
+  };
+
+  const badgeColors = getBadgeColor(report.reportType);
 
   return (
     <TouchableOpacity
-      style={styles.reportCardContainer}
-      onPress={() => onSelect(report)}
+      style={styles.reportCard}
+      onPress={async () => {
+        await Haptics.selectionAsync();
+        onSelect(report);
+      }}
       activeOpacity={0.7}
     >
-      <View style={styles.reportCard}>
-        <View style={styles.reportInfo}>
-          <Text style={styles.reportLabel}>{report.label}</Text>
-          <Text style={styles.reportDate}>{uploadDate}</Text>
-          {report.reportType && (
-            <View style={styles.reportTypeBadge}>
-              <Text style={styles.reportTypeBadgeText}>{report.reportType}</Text>
-            </View>
-          )}
-        </View>
-        <ChevronRight size={20} color={colors.gray400} />
+      {/* Leading Icon */}
+      <View style={[styles.reportIcon, { backgroundColor: `${getIconColor(report.reportType)}15` }]}>
+        <FileText size={22} color={getIconColor(report.reportType)} strokeWidth={1.5} />
       </View>
-      <TouchableOpacity
-        style={styles.deleteButton}
-        onPress={() => onDelete(report.reportId)}
-      >
-        <Trash2 size={16} color={colors.error} />
-      </TouchableOpacity>
+
+      {/* Middle Content */}
+      <View style={styles.reportContent}>
+        <Text style={styles.reportLabel} numberOfLines={1}>
+          {report.label || "Untitled Report"}
+        </Text>
+        <Text style={styles.reportDate}>{uploadDate}</Text>
+        {report.reportType && (
+          <View style={[styles.reportBadge, { backgroundColor: badgeColors.bg }]}>
+            <Text style={[styles.reportBadgeText, { color: badgeColors.text }]}>
+              {report.reportType}
+            </Text>
+          </View>
+        )}
+      </View>
+
+      {/* Trailing Actions */}
+      <View style={styles.reportActions}>
+        <TouchableOpacity
+          style={styles.deleteButton}
+          onPress={async (e) => {
+            e.stopPropagation();
+            await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            onDelete(report.reportId);
+          }}
+        >
+          <Trash2 size={18} color="#FF3B30" strokeWidth={1.5} />
+        </TouchableOpacity>
+        <ChevronRight size={20} color="#C7C7CC" strokeWidth={2} />
+      </View>
     </TouchableOpacity>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
+  container: {
+    flex: 1,
+    backgroundColor: "#F2F2F7",
+  },
+  scrollView: {
+    flex: 1,
+  },
   scrollContent: {
-    paddingBottom: spacing.xl,
-  },
-  header: {
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.xl,
-    paddingBottom: spacing.md,
-  },
-  title: {
-    marginBottom: spacing.xs,
-  },
-  subtitle: {
-    color: colors.gray600,
+    paddingTop: 120,
+    paddingBottom: 24,
   },
 
-  // Upload Section
-  uploadCard: {
-    marginHorizontal: spacing.lg,
-    padding: spacing.lg,
-    backgroundColor: colors.white,
-    borderRadius: borderRadius.lg,
-    borderWidth: 1,
-    borderColor: colors.primary50,
-    gap: spacing.md,
-    marginBottom: spacing.xl,
+  // Glassmorphic Header
+  header: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 10,
+    paddingTop: 60,
+    paddingBottom: 16,
+    paddingHorizontal: 20,
   },
-  uploadHeader: {
+  headerContent: {
     flexDirection: "row",
     alignItems: "center",
-    gap: spacing.sm,
+    justifyContent: "space-between",
   },
-  uploadTitle: {
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: "600",
+    color: "#1C1C1E",
+    letterSpacing: -0.5,
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(255, 255, 255, 0.7)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  searchButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(255, 255, 255, 0.7)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  // Hero Upload Card
+  heroCard: {
+    marginHorizontal: 16,
+    marginBottom: 24,
+    borderRadius: 28,
+    overflow: "hidden",
+    backgroundColor: "#FFFFFF",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 15,
+    elevation: 5,
+  },
+  uploadIconContainer: {
+    alignItems: "center",
+    paddingTop: 32,
+    paddingBottom: 20,
+  },
+  heroTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#1C1C1E",
+    textAlign: "center",
+    marginBottom: 8,
+    letterSpacing: -0.4,
+  },
+  labelInput: {
     fontSize: 16,
-    fontWeight: "600",
-    color: colors.gray900,
+    fontWeight: "400",
+    color: "#1C1C1E",
+    paddingHorizontal: 24,
+    paddingVertical: 14,
+    backgroundColor: "rgba(0, 0, 0, 0.02)",
+    marginHorizontal: 20,
+    borderRadius: 16,
+    marginBottom: 16,
   },
-  input: {
-    borderWidth: 1,
-    borderColor: colors.gray200,
-    borderRadius: borderRadius.md,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
+
+  // Quick Tags
+  quickTagsContainer: {
+    paddingHorizontal: 20,
+    paddingBottom: 16,
+  },
+  quickTag: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: "rgba(0, 0, 0, 0.04)",
+    borderRadius: 20,
+    marginRight: 10,
+  },
+  quickTagActive: {
+    backgroundColor: "#007AFF",
+  },
+  quickTagText: {
     fontSize: 14,
-    color: colors.gray900,
-    backgroundColor: colors.gray50,
-  },
-  reportTypeSelector: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: spacing.sm,
-  },
-  typeChip: {
-    paddingVertical: spacing.xs,
-    paddingHorizontal: spacing.md,
-    borderRadius: borderRadius.full,
-    borderWidth: 1,
-    borderColor: colors.gray200,
-    backgroundColor: colors.white,
-  },
-  typeChipActive: {
-    backgroundColor: colors.primary50,
-    borderColor: colors.primary,
-  },
-  typeChipText: {
-    fontSize: 12,
-    color: colors.gray600,
-    fontWeight: "600",
-  },
-  typeChipTextActive: {
-    color: colors.primary700,
-  },
-  fileButton: {
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.md,
-    borderWidth: 2,
-    borderStyle: "dashed",
-    borderColor: colors.gray300,
-    borderRadius: borderRadius.md,
-    backgroundColor: colors.gray50,
-    alignItems: "center",
-  },
-  fileButtonActive: {
-    borderColor: colors.primary,
-    backgroundColor: colors.primary50,
-  },
-  fileButtonText: {
-    fontSize: 14,
-    color: colors.gray700,
     fontWeight: "500",
+    color: "#8E8E93",
+  },
+  quickTagTextActive: {
+    color: "#FFFFFF",
+  },
+
+  // File Picker
+  filePickerButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.02)",
+    paddingVertical: 14,
+    marginHorizontal: 20,
+    borderRadius: 16,
+    marginBottom: 16,
+    gap: 8,
+  },
+  filePickerButtonActive: {
+    backgroundColor: "rgba(0, 122, 255, 0.1)",
+  },
+  filePickerText: {
+    fontSize: 15,
+    fontWeight: "500",
+    color: "#8E8E93",
+  },
+  filePickerTextActive: {
+    color: "#007AFF",
+  },
+
+  // Status Messages
+  errorContainer: {
+    backgroundColor: "rgba(255, 59, 48, 0.1)",
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    marginHorizontal: 20,
+    borderRadius: 16,
+    marginBottom: 12,
+  },
+  successContainer: {
+    backgroundColor: "rgba(52, 199, 89, 0.1)",
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    marginHorizontal: 20,
+    borderRadius: 16,
+    marginBottom: 12,
   },
   errorText: {
-    color: colors.error,
-    fontSize: 12,
+    fontSize: 14,
+    fontWeight: "500",
+    color: "#FF3B30",
+    textAlign: "center",
   },
   successText: {
-    color: colors.success,
-    fontSize: 12,
+    fontSize: 14,
+    fontWeight: "500",
+    color: "#34C759",
+    textAlign: "center",
+  },
+
+  // Upload CTA Button
+  uploadButton: {
+    marginHorizontal: 20,
+    marginBottom: 20,
+    borderRadius: 16,
+    overflow: "hidden",
+    shadowColor: "#34C759",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 5,
+  },
+  uploadButtonDisabled: {
+    opacity: 0.5,
+  },
+  uploadButtonGradient: {
+    paddingVertical: 16,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  uploadButtonText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#FFFFFF",
+    letterSpacing: 0.3,
   },
 
   // Reports Section
   reportsSection: {
-    paddingHorizontal: spacing.lg,
+    flex: 1,
   },
   sectionHeader: {
-    marginBottom: spacing.md,
-  },
-  sectionTitle: {
-    color: colors.gray900,
-  },
-  centerContainer: {
-    paddingVertical: spacing.xl,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  emptyState: {
-    paddingVertical: spacing.xl,
-    alignItems: "center",
-    gap: spacing.sm,
-  },
-  emptyText: {
     fontSize: 16,
     fontWeight: "600",
-    color: colors.gray600,
+    color: "#1C1C1E",
+    marginHorizontal: 20,
+    marginBottom: 12,
+    letterSpacing: -0.3,
   },
-  emptySubtext: {
-    fontSize: 13,
-    color: colors.gray500,
+  loadingContainer: {
+    paddingVertical: 40,
+    alignItems: "center",
+  },
+  emptyState: {
+    paddingVertical: 60,
+    alignItems: "center",
+    paddingHorizontal: 40,
+  },
+  emptyText: {
+    fontSize: 17,
+    fontWeight: "600",
+    color: "#1C1C1E",
+    marginTop: 16,
+    marginBottom: 8,
     textAlign: "center",
   },
-  reportCardContainer: {
-    marginBottom: spacing.md,
+  emptySubtext: {
+    fontSize: 14,
+    fontWeight: "400",
+    color: "#8E8E93",
+    textAlign: "center",
+    lineHeight: 20,
   },
+  cardSeparator: {
+    height: 12,
+  },
+
+  // Report Card (Elevated Design)
   reportCard: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
-    backgroundColor: colors.white,
-    borderRadius: borderRadius.md,
-    borderWidth: 1,
-    borderColor: colors.gray200,
+    backgroundColor: "#FFFFFF",
+    marginHorizontal: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    borderRadius: 22,
+    gap: 14,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 3,
   },
-  reportInfo: {
+  reportIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  reportContent: {
     flex: 1,
-    gap: spacing.xs,
+    gap: 4,
   },
   reportLabel: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: "600",
-    color: colors.gray900,
+    color: "#1C1C1E",
+    letterSpacing: -0.3,
   },
   reportDate: {
-    fontSize: 12,
-    color: colors.gray500,
+    fontSize: 13,
+    fontWeight: "400",
+    color: "#8E8E93",
   },
-  reportTypeBadge: {
-    backgroundColor: colors.primary50,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-    borderRadius: borderRadius.full,
+  reportBadge: {
     alignSelf: "flex-start",
-    marginTop: spacing.xs,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+    marginTop: 6,
   },
-  reportTypeBadgeText: {
-    fontSize: 11,
+  reportBadgeText: {
+    fontSize: 12,
     fontWeight: "600",
-    color: colors.primary700,
+    letterSpacing: 0.2,
+  },
+  reportActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
   },
   deleteButton: {
-    padding: spacing.sm,
-  },
-  separator: {
-    height: 1,
-    backgroundColor: colors.gray100,
-    marginVertical: spacing.xs,
-  },
-
-  // Old styles (kept for backwards compatibility if needed)
-  card: {
-    marginHorizontal: spacing.lg,
-    marginBottom: spacing.lg,
-    padding: spacing.lg,
-    borderRadius: borderRadius.lg,
-    backgroundColor: colors.white,
-    borderWidth: 1,
-    borderColor: colors.gray200,
-    gap: spacing.sm,
-  },
-  sectionLabel: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: colors.gray500,
-    textTransform: "uppercase",
-    letterSpacing: 0.6,
-  },
-  infoRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "rgba(255, 59, 48, 0.1)",
     alignItems: "center",
-    paddingVertical: spacing.xs,
-  },
-  infoLabel: {
-    fontSize: 13,
-    color: colors.gray600,
-  },
-  infoValue: {
-    fontSize: 13,
-    color: colors.gray900,
-    fontWeight: "600",
+    justifyContent: "center",
   },
 });
