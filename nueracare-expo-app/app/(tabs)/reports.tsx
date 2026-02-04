@@ -14,6 +14,7 @@ import {
   LayoutAnimation,
   UIManager,
   ImageBackground,
+  Modal,
 } from "react-native";
 import * as DocumentPicker from "expo-document-picker";
 import * as Haptics from "expo-haptics";
@@ -28,6 +29,7 @@ import {
   UploadReportResponse,
   fetchUserReports,
   UserReport,
+  generateReportSummary,
 } from "@/services/backend";
 import { 
   ChevronRight, 
@@ -38,6 +40,7 @@ import {
   Activity,
   Search,
   ChevronLeft,
+  X,
 } from "lucide-react-native";
 
 const LAST_REPORT_ID_KEY = "nueracare:lastReportId";
@@ -63,6 +66,10 @@ export default function ReportsScreen() {
   const [loadingReports, setLoadingReports] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchMode, setSearchMode] = useState(false);
+  const [loadingSummaries, setLoadingSummaries] = useState<Set<string>>(new Set());
+  const [summaryModalVisible, setSummaryModalVisible] = useState(false);
+  const [selectedReportForSummary, setSelectedReportForSummary] = useState<UserReport | null>(null);
+  const [summaryText, setSummaryText] = useState<string | null>(null);
 
   // Auto-dismiss success message after 3 seconds
   useEffect(() => {
@@ -85,6 +92,7 @@ export default function ReportsScreen() {
     setLoadingReports(true);
     try {
       const fetchedReports = await fetchUserReports(uid);
+      console.log('📊 Fetched reports:', fetchedReports.length);
       setReports(fetchedReports);
     } catch (err) {
       console.error("Error loading reports:", err);
@@ -169,7 +177,48 @@ export default function ReportsScreen() {
   const handleSelectReport = async (report: UserReport) => {
     await Haptics.selectionAsync();
     await AsyncStorage.setItem(LAST_REPORT_ID_KEY, report.reportId);
-    // Navigate to chat is handled by tab navigation
+    
+    // Show modal for summary
+    setSelectedReportForSummary(report);
+    setSummaryModalVisible(true);
+    setSummaryText(report.summary || null);
+    
+    // Generate summary if it doesn't exist
+    if (!report.summary && report.extractedText) {
+      try {
+        setLoadingSummaries(prev => new Set(prev).add(report.reportId));
+        console.log(`🤖 Generating summary for report ${report.reportId}...`);
+        const summaryResult = await generateReportSummary(report.reportId, userId, false);
+        console.log(`✅ Summary result:`, summaryResult);
+        
+        if (summaryResult.summary) {
+          setSummaryText(summaryResult.summary);
+          // Update report in list
+          setReports(currentReports => 
+            currentReports.map(r => 
+              r.reportId === report.reportId 
+                ? { ...r, summary: summaryResult.summary, summaryGeneratedAt: summaryResult.generated_at }
+                : r
+            )
+          );
+        }
+      } catch (err) {
+        console.error(`❌ Failed to generate summary:`, err);
+        setSummaryText("Failed to generate summary. Please try again.");
+      } finally {
+        setLoadingSummaries(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(report.reportId);
+          return newSet;
+        });
+      }
+    }
+  };
+
+  const closeSummaryModal = () => {
+    setSummaryModalVisible(false);
+    setSelectedReportForSummary(null);
+    setSummaryText(null);
   };
 
   const handleDeleteReport = async (reportId: string) => {
@@ -380,6 +429,105 @@ export default function ReportsScreen() {
           <Text style={styles.successText}>✓ {success}</Text>
         </View>
       )}
+
+      {/* Summary Modal */}
+      <Modal
+        visible={summaryModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={closeSummaryModal}
+      >
+        <View style={styles.modalOverlay}>
+          <BlurView intensity={90} tint="dark" style={styles.blurContainer}>
+            <TouchableOpacity 
+              style={styles.modalBackdrop}
+              activeOpacity={1}
+              onPress={closeSummaryModal}
+            />
+          </BlurView>
+
+          <View style={styles.modalContent}>
+            {/* Modal Header */}
+            <View style={styles.modalHeader}>
+              <View style={styles.modalHeaderLeft}>
+                <Text style={styles.modalHeaderTitle}>AI Summary</Text>
+              </View>
+              <TouchableOpacity
+                style={styles.closeButton}
+                onPress={closeSummaryModal}
+              >
+                <X size={24} color="#1F2937" strokeWidth={2} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Report Info */}
+            {selectedReportForSummary && (
+              <View style={styles.reportInfoSection}>
+                <View style={styles.reportInfoContent}>
+                  <Text style={styles.reportInfoLabel} numberOfLines={1}>
+                    {selectedReportForSummary.label || "Untitled Report"}
+                  </Text>
+                  {selectedReportForSummary.reportType && (
+                    <Text style={styles.reportInfoType}>
+                      {selectedReportForSummary.reportType}
+                    </Text>
+                  )}
+                </View>
+              </View>
+            )}
+
+            {/* Summary Content */}
+            <ScrollView
+              style={styles.summaryScroll}
+              showsVerticalScrollIndicator={false}
+            >
+              {loadingSummaries.has(selectedReportForSummary?.reportId || "") ? (
+                <View style={styles.loadingState}>
+                  <ActivityIndicator
+                    size="large"
+                    color="#1E88E5"
+                    style={styles.spinner}
+                  />
+                  <Text style={styles.loadingText}>
+                    Generating your summary...
+                  </Text>
+                  <Text style={styles.loadingSubtext}>
+                    This won't take long
+                  </Text>
+                </View>
+              ) : summaryText ? (
+                <View style={styles.summaryCard}>
+                  <Text style={styles.summaryText}>{summaryText}</Text>
+                </View>
+              ) : (
+                <View style={styles.emptyState}>
+                  <Text style={styles.emptyText}>No Summary Available</Text>
+                  <Text style={styles.emptySubtext}>
+                    This report doesn't have extracted text for summary generation.
+                  </Text>
+                </View>
+              )}
+            </ScrollView>
+
+            {/* Modal Footer */}
+            <View style={styles.modalFooter}>
+              <LinearGradient
+                colors={["#1E88E5", "#1565C0"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.closeButtonGradient}
+              >
+                <TouchableOpacity
+                  onPress={closeSummaryModal}
+                  style={styles.closeButtonContent}
+                >
+                  <Text style={styles.closeButtonText}>Got it</Text>
+                </TouchableOpacity>
+              </LinearGradient>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -446,14 +594,16 @@ const ReportCard = ({
         <Text style={styles.reportLabel} numberOfLines={1}>
           {report.label || "Untitled Report"}
         </Text>
-        <Text style={styles.reportDate}>{uploadDate}</Text>
-        {report.reportType && (
-          <View style={[styles.reportBadge, { backgroundColor: badgeColors.bg }]}>
-            <Text style={[styles.reportBadgeText, { color: badgeColors.text }]}>
-              {report.reportType}
-            </Text>
-          </View>
-        )}
+        <View style={styles.reportMetaRow}>
+          <Text style={styles.reportDate}>{uploadDate}</Text>
+          {report.reportType && (
+            <View style={[styles.reportBadge, { backgroundColor: badgeColors.bg }]}>
+              <Text style={[styles.reportBadgeText, { color: badgeColors.text }]}>
+                {report.reportType}
+              </Text>
+            </View>
+          )}
+        </View>
       </View>
 
       {/* Trailing Actions */}
@@ -791,6 +941,27 @@ const styles = StyleSheet.create({
     color: "#1F2937",
     letterSpacing: -0.3,
   },
+  reportSummary: {
+    fontSize: 13,
+    fontWeight: "400",
+    color: "#6B7280",
+    lineHeight: 18,
+    marginTop: 2,
+  },
+  reportSummaryLoading: {
+    fontSize: 13,
+    fontWeight: "400",
+    color: "#9CA3AF",
+    lineHeight: 18,
+    marginTop: 2,
+    fontStyle: "italic",
+  },
+  reportMetaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 4,
+  },
   reportDate: {
     fontSize: 13,
     fontWeight: "400",
@@ -801,7 +972,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 8,
-    marginTop: 6,
   },
   reportBadgeText: {
     fontSize: 12,
@@ -820,5 +990,162 @@ const styles = StyleSheet.create({
     backgroundColor: "#FEECEC",
     alignItems: "center",
     justifyContent: "center",
+  },
+
+  // Modal Styles
+  modalOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 998,
+  },
+  blurContainer: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  modalBackdrop: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  modalContent: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: "#FFFFFF",
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    maxHeight: "85%",
+    paddingBottom: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 20,
+    elevation: 15,
+    zIndex: 999,
+  },
+  modalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F0F0F0",
+  },
+  modalHeaderLeft: {
+    flex: 1,
+  },
+  modalHeaderTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#1F2937",
+    letterSpacing: -0.5,
+  },
+  closeButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#F5F5F5",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  reportInfoSection: {
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    backgroundColor: "rgba(46, 196, 182, 0.08)",
+    borderRadius: 12,
+    marginHorizontal: 20,
+    marginTop: 16,
+    marginBottom: 0,
+  },
+  reportInfoContent: {
+    gap: 4,
+  },
+  reportInfoLabel: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: "#1F2937",
+  },
+  reportInfoType: {
+    fontSize: 13,
+    fontWeight: "500",
+    color: "#6B7280",
+  },
+  summaryScroll: {
+    flex: 1,
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 8,
+  },
+  loadingState: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 60,
+    paddingHorizontal: 20,
+  },
+  spinner: {
+    marginBottom: 16,
+  },
+  loadingText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#1F2937",
+    marginBottom: 4,
+    textAlign: "center",
+  },
+  loadingSubtext: {
+    fontSize: 13,
+    fontWeight: "400",
+    color: "#9CA3AF",
+    textAlign: "center",
+  },
+  summaryCard: {
+    backgroundColor: "#FAFAFA",
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: "#F0F0F0",
+  },
+  summaryText: {
+    fontSize: 15,
+    fontWeight: "400",
+    color: "#374151",
+    lineHeight: 24,
+    letterSpacing: 0.2,
+  },
+  modalFooter: {
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: 20,
+    backgroundColor: "#FFFFFF",
+    borderTopWidth: 1,
+    borderTopColor: "#F0F0F0",
+  },
+  closeButtonGradient: {
+    height: 52,
+    borderRadius: 14,
+    overflow: "hidden",
+  },
+  closeButtonContent: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  closeButtonText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#FFFFFF",
+    letterSpacing: 0.3,
   },
 });

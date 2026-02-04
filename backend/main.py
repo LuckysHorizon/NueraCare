@@ -8,6 +8,7 @@ load_dotenv()
 from routers.reports import router as reports_router
 from routers.chat import router as chat_router
 from routers.voice import router as voice_router
+from routers.summary import router as summary_router
 
 app = FastAPI(title="NueraCare Backend", version="1.0.0")
 
@@ -22,6 +23,7 @@ app.add_middleware(
 app.include_router(reports_router, prefix="/api")
 app.include_router(chat_router, prefix="/api")
 app.include_router(voice_router, prefix="/api")
+app.include_router(summary_router, prefix="/api")
 
 
 @app.get("/health")

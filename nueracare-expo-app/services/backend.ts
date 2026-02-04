@@ -206,6 +206,8 @@ export interface UserReport {
   reportType?: string;
   uploadDate: string;
   extractedText?: string;
+  summary?: string | null;
+  summaryGeneratedAt?: string | null;
 }
 
 export interface ChatMessage {
@@ -320,5 +322,74 @@ export async function transcribeAudio(audioUri: string): Promise<string> {
   } catch (error) {
     console.error("Error transcribing audio:", error);
     throw error;
+  }
+}
+export interface SummaryResponse {
+  report_id: string;
+  summary: string | null;
+  cached: boolean;
+  generated_at: string | null;
+  source?: string | null;
+  error?: string | null;
+  wait_time?: number | null;
+}
+
+export async function generateReportSummary(
+  reportId: string,
+  userId: string,
+  forceRegenerate: boolean = false
+): Promise<SummaryResponse> {
+  const baseUrl = getBackendBaseUrl();
+  const endpoint = "/api/generate-summary";
+
+  try {
+    const response = await fetch(`${baseUrl}${endpoint}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        report_id: reportId,
+        user_id: userId,
+        force_regenerate: forceRegenerate,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.detail || "Failed to generate summary");
+    }
+
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error("Error generating summary:", error);
+    throw error;
+  }
+}
+
+export async function getReportSummary(
+  reportId: string,
+  userId: string
+): Promise<{ summary: string | null; generated_at: string | null }> {
+  const baseUrl = getBackendBaseUrl();
+  const endpoint = `/api/report-summary/${reportId}?user_id=${userId}`;
+
+  try {
+    const response = await fetch(`${baseUrl}${endpoint}`, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" },
+    });
+
+    if (!response.ok) {
+      return { summary: null, generated_at: null };
+    }
+
+    const data = await response.json();
+    return {
+      summary: data.summary || null,
+      generated_at: data.generated_at || null,
+    };
+  } catch (error) {
+    console.error("Error fetching summary:", error);
+    return { summary: null, generated_at: null };
   }
 }

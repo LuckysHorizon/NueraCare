@@ -149,7 +149,7 @@ class SanityService:
         if not self._can_use_sanity():
             return []
 
-        query = f'*[_type == "medicalReport" && userId == "{user_id}"] | order(uploadDate desc) {{_id, reportId, userId, label, reportType, uploadDate, extractedText, fileUrl}}'
+        query = f'*[_type == "medicalReport" && userId == "{user_id}"] | order(uploadDate desc) {{_id, reportId, userId, label, reportType, uploadDate, extractedText, fileUrl, summary, summaryGeneratedAt}}'
         
         headers = {"Authorization": f"Bearer {self.token}"}
         
@@ -242,3 +242,52 @@ class SanityService:
         except Exception as e:
             print(f"⚠️ Failed to fetch chat history: {type(e).__name__}")
             return None
+
+    def update_report_summary(self, report_id: str, user_id: str, summary: str) -> bool:
+        """Update the AI-generated summary for a report."""
+        if not self._can_use_sanity():
+            return False
+
+        try:
+            import urllib.parse
+            # First, get the document _id
+            query = f'*[_type == "medicalReport" && reportId == "{report_id}" && userId == "{user_id}"][0]{{_id}}'
+            encoded_query = urllib.parse.quote(query)
+            url = f"{self._query_url()}?query={encoded_query}"
+            
+            headers = {"Authorization": f"Bearer {self.token}"}
+            
+            with httpx.Client(timeout=10.0) as client:
+                response = client.get(url, headers=headers)
+                response.raise_for_status()
+                result = response.json().get("result")
+                
+                if not result or not result.get("_id"):
+                    print(f"⚠️ Report not found for summary update")
+                    return False
+                
+                doc_id = result["_id"]
+                
+                # Update the document with summary
+                patch = {
+                    "mutations": [
+                        {
+                            "patch": {
+                                "id": doc_id,
+                                "set": {
+                                    "summary": summary,
+                                    "summaryGeneratedAt": datetime.utcnow().isoformat() + "Z"
+                                }
+                            }
+                        }
+                    ]
+                }
+                
+                response = client.post(self._mutation_url(), json=patch, headers=headers)
+                response.raise_for_status()
+                print(f"✓ Summary updated in Sanity for report {report_id}")
+                return True
+                
+        except Exception as e:
+            print(f"❌ Failed to update summary: {type(e).__name__}: {str(e)}")
+            return False
