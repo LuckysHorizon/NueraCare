@@ -13,6 +13,7 @@ import {
   Dimensions,
   LayoutAnimation,
   UIManager,
+  ImageBackground,
 } from "react-native";
 import * as DocumentPicker from "expo-document-picker";
 import * as Haptics from "expo-haptics";
@@ -60,6 +61,16 @@ export default function ReportsScreen() {
   const [success, setSuccess] = useState<string | null>(null);
   const [reports, setReports] = useState<UserReport[]>([]);
   const [loadingReports, setLoadingReports] = useState(false);
+
+  // Auto-dismiss success message after 3 seconds
+  useEffect(() => {
+    if (success) {
+      const timer = setTimeout(() => {
+        setSuccess(null);
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [success]);
 
   useEffect(() => {
     if (user?.id) {
@@ -189,15 +200,14 @@ export default function ReportsScreen() {
         showsVerticalScrollIndicator={false}
         style={styles.scrollView}
       >
-        {/* Hero Upload Card with Gradient */}
-        <LinearGradient
-          colors={["#E0F2FE", "#FFFFFF"]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
+        {/* Hero Upload Card with Background Image */}
+        <ImageBackground
+          source={require("@/assets/card-bg.jpeg")}
           style={styles.heroCard}
+          imageStyle={styles.heroCardImage}
         >
           <View style={styles.uploadIconContainer}>
-            <CloudUpload size={44} color="#007AFF" strokeWidth={1.5} />
+            <CloudUpload size={44} color="#1E88E5" strokeWidth={1.5} />
           </View>
           
           <Text style={styles.heroTitle}>Upload New Report</Text>
@@ -207,7 +217,7 @@ export default function ReportsScreen() {
             value={reportLabel}
             onChangeText={setReportLabel}
             style={styles.labelInput}
-            placeholderTextColor="#8E8E93"
+            placeholderTextColor="#9CA3AF"
           />
 
           {/* Quick Tags */}
@@ -247,7 +257,7 @@ export default function ReportsScreen() {
           >
             <FileText 
               size={18} 
-              color={selectedFile ? "#007AFF" : "#8E8E93"} 
+              color={selectedFile ? "#1E88E5" : "#9CA3AF"} 
               strokeWidth={1.5} 
             />
             <Text style={[
@@ -258,15 +268,10 @@ export default function ReportsScreen() {
             </Text>
           </TouchableOpacity>
 
-          {/* Status Messages */}
+          {/* Status Messages - Only Error shown inline */}
           {error && (
             <View style={styles.errorContainer}>
               <Text style={styles.errorText}>⚠️ {error}</Text>
-            </View>
-          )}
-          {success && (
-            <View style={styles.successContainer}>
-              <Text style={styles.successText}>✓ {success}</Text>
             </View>
           )}
 
@@ -277,7 +282,7 @@ export default function ReportsScreen() {
             disabled={!canUpload || uploading}
           >
             <LinearGradient
-              colors={canUpload && !uploading ? ["#34C759", "#30D158"] : ["#C7C7CC", "#C7C7CC"]}
+              colors={canUpload && !uploading ? ["#1E88E5", "#1565C0"] : ["#CBD5E1", "#CBD5E1"]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={styles.uploadButtonGradient}
@@ -291,7 +296,7 @@ export default function ReportsScreen() {
               )}
             </LinearGradient>
           </TouchableOpacity>
-        </LinearGradient>
+        </ImageBackground>
 
         {/* Reports List Section */}
         <View style={styles.reportsSection}>
@@ -326,6 +331,13 @@ export default function ReportsScreen() {
           )}
         </View>
       </ScrollView>
+
+      {/* Success Feedback Popup - Instant notification that auto-dismisses */}
+      {success && (
+        <View style={styles.successContainer}>
+          <Text style={styles.successText}>✓ {success}</Text>
+        </View>
+      )}
     </View>
   );
 }
@@ -348,26 +360,26 @@ const ReportCard = ({
   const getIconColor = (type?: string) => {
     switch (type?.toLowerCase()) {
       case "blood test":
-        return "#FF3B30";
+        return "#E63946";
       case "x-ray":
-        return "#007AFF";
+        return "#1E88E5";
       case "ecg":
-        return "#34C759";
+        return "#2EC4B6";
       default:
-        return "#8E8E93";
+        return "#9CA3AF";
     }
   };
 
   const getBadgeColor = (type?: string) => {
     switch (type?.toLowerCase()) {
       case "blood test":
-        return { bg: "rgba(255, 59, 48, 0.1)", text: "#FF3B30" };
+        return { bg: "rgba(230, 57, 70, 0.1)", text: "#E63946" };
       case "x-ray":
-        return { bg: "rgba(0, 122, 255, 0.1)", text: "#007AFF" };
+        return { bg: "rgba(30, 136, 229, 0.1)", text: "#1E88E5" };
       case "ecg":
-        return { bg: "rgba(52, 199, 89, 0.1)", text: "#34C759" };
+        return { bg: "rgba(46, 196, 182, 0.1)", text: "#2EC4B6" };
       default:
-        return { bg: "rgba(142, 142, 147, 0.1)", text: "#8E8E93" };
+        return { bg: "rgba(156, 163, 175, 0.1)", text: "#6B7280" };
     }
   };
 
@@ -412,9 +424,9 @@ const ReportCard = ({
             onDelete(report.reportId);
           }}
         >
-          <Trash2 size={18} color="#FF3B30" strokeWidth={1.5} />
+          <Trash2 size={18} color="#E63946" strokeWidth={1.5} />
         </TouchableOpacity>
-        <ChevronRight size={20} color="#C7C7CC" strokeWidth={2} />
+        <ChevronRight size={20} color="#CBD5E1" strokeWidth={2} />
       </View>
     </TouchableOpacity>
   );
@@ -423,7 +435,7 @@ const ReportCard = ({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F2F2F7",
+    backgroundColor: "#D9F0ED",
   },
   scrollView: {
     flex: 1,
@@ -443,6 +455,9 @@ const styles = StyleSheet.create({
     paddingTop: 60,
     paddingBottom: 16,
     paddingHorizontal: 20,
+    backgroundColor: "rgba(217, 240, 237, 0.85)",
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(46, 196, 182, 0.1)",
   },
   headerContent: {
     flexDirection: "row",
@@ -452,14 +467,14 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 20,
     fontWeight: "600",
-    color: "#1C1C1E",
+    color: "#1F2937",
     letterSpacing: -0.5,
   },
   backButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: "rgba(255, 255, 255, 0.7)",
+    backgroundColor: "rgba(46, 196, 182, 0.15)",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -467,7 +482,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: "rgba(255, 255, 255, 0.7)",
+    backgroundColor: "rgba(46, 196, 182, 0.15)",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -476,59 +491,69 @@ const styles = StyleSheet.create({
   heroCard: {
     marginHorizontal: 16,
     marginBottom: 24,
-    borderRadius: 28,
+    borderRadius: 20,
     overflow: "hidden",
     backgroundColor: "#FFFFFF",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 15,
+    shadowColor: "#2EC4B6",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.12,
+    shadowRadius: 24,
     elevation: 5,
+  },
+  heroCardImage: {
+    borderRadius: 20,
+    resizeMode: "cover",
   },
   uploadIconContainer: {
     alignItems: "center",
-    paddingTop: 32,
-    paddingBottom: 20,
+    paddingTop: 28,
+    paddingBottom: 16,
   },
   heroTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: "600",
-    color: "#1C1C1E",
+    color: "#1F2937",
     textAlign: "center",
-    marginBottom: 8,
-    letterSpacing: -0.4,
+    marginBottom: 20,
+    letterSpacing: -0.3,
+    marginHorizontal: 20,
   },
   labelInput: {
-    fontSize: 16,
-    fontWeight: "400",
-    color: "#1C1C1E",
-    paddingHorizontal: 24,
-    paddingVertical: 14,
-    backgroundColor: "rgba(0, 0, 0, 0.02)",
+    height: 48,
+    fontSize: 14,
+    fontWeight: "500",
+    color: "#1F2937",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: "#FFFFFF",
     marginHorizontal: 20,
-    borderRadius: 16,
-    marginBottom: 16,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: "#DDE7F0",
+    marginBottom: 14,
   },
 
   // Quick Tags
   quickTagsContainer: {
     paddingHorizontal: 20,
-    paddingBottom: 16,
+    paddingBottom: 14,
   },
   quickTag: {
+    height: 36,
     paddingHorizontal: 16,
-    paddingVertical: 8,
-    backgroundColor: "rgba(0, 0, 0, 0.04)",
-    borderRadius: 20,
+    backgroundColor: "#F1F5F9",
+    borderRadius: 18,
     marginRight: 10,
+    alignItems: "center",
+    justifyContent: "center",
   },
   quickTagActive: {
-    backgroundColor: "#007AFF",
+    backgroundColor: "#1E88E5",
   },
   quickTagText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: "500",
-    color: "#8E8E93",
+    color: "#475569",
   },
   quickTagTextActive: {
     color: "#FFFFFF",
@@ -539,77 +564,96 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(0, 0, 0, 0.02)",
-    paddingVertical: 14,
+    height: 48,
+    backgroundColor: "#FFFFFF",
+    paddingHorizontal: 16,
     marginHorizontal: 20,
-    borderRadius: 16,
-    marginBottom: 16,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: "#DDE7F0",
+    marginBottom: 14,
     gap: 8,
   },
   filePickerButtonActive: {
-    backgroundColor: "rgba(0, 122, 255, 0.1)",
+    backgroundColor: "rgba(30, 136, 229, 0.05)",
+    borderColor: "#1E88E5",
   },
   filePickerText: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: "500",
-    color: "#8E8E93",
+    color: "#475569",
   },
   filePickerTextActive: {
-    color: "#007AFF",
+    color: "#1E88E5",
   },
 
   // Status Messages
   errorContainer: {
-    backgroundColor: "rgba(255, 59, 48, 0.1)",
+    height: 44,
+    backgroundColor: "rgba(230, 57, 70, 0.1)",
     paddingVertical: 12,
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
     marginHorizontal: 20,
-    borderRadius: 16,
-    marginBottom: 12,
+    borderRadius: 12,
+    marginBottom: 14,
+    justifyContent: "center",
   },
   successContainer: {
-    backgroundColor: "rgba(52, 199, 89, 0.1)",
+    position: "absolute",
+    bottom: 100,
+    left: 20,
+    right: 20,
+    height: 48,
+    backgroundColor: "#2ECC71",
     paddingVertical: 12,
-    paddingHorizontal: 20,
-    marginHorizontal: 20,
-    borderRadius: 16,
-    marginBottom: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 999,
+    shadowColor: "#2ECC71",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+    elevation: 8,
   },
   errorText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: "500",
-    color: "#FF3B30",
+    color: "#E63946",
     textAlign: "center",
   },
   successText: {
     fontSize: 14,
-    fontWeight: "500",
-    color: "#34C759",
+    fontWeight: "600",
+    color: "#FFFFFF",
     textAlign: "center",
+    letterSpacing: 0.3,
   },
 
   // Upload CTA Button
   uploadButton: {
     marginHorizontal: 20,
-    marginBottom: 20,
-    borderRadius: 16,
+    marginBottom: 16,
+    borderRadius: 14,
     overflow: "hidden",
-    shadowColor: "#34C759",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
-    elevation: 5,
+    height: 52,
+    shadowColor: "#1E88E5",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 3,
   },
   uploadButtonDisabled: {
-    opacity: 0.5,
+    opacity: 0.7,
   },
   uploadButtonGradient: {
-    paddingVertical: 16,
+    height: 52,
     alignItems: "center",
     justifyContent: "center",
   },
   uploadButtonText: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: "600",
     color: "#FFFFFF",
     letterSpacing: 0.3,
@@ -622,7 +666,7 @@ const styles = StyleSheet.create({
   sectionHeader: {
     fontSize: 16,
     fontWeight: "600",
-    color: "#1C1C1E",
+    color: "#1F2937",
     marginHorizontal: 20,
     marginBottom: 12,
     letterSpacing: -0.3,
@@ -639,7 +683,7 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 17,
     fontWeight: "600",
-    color: "#1C1C1E",
+    color: "#1F2937",
     marginTop: 16,
     marginBottom: 8,
     textAlign: "center",
@@ -647,7 +691,7 @@ const styles = StyleSheet.create({
   emptySubtext: {
     fontSize: 14,
     fontWeight: "400",
-    color: "#8E8E93",
+    color: "#6B7280",
     textAlign: "center",
     lineHeight: 20,
   },
@@ -663,12 +707,12 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
     paddingHorizontal: 16,
     paddingVertical: 16,
-    borderRadius: 22,
+    borderRadius: 16,
     gap: 14,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
+    shadowColor: "#2EC4B6",
+    shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.08,
-    shadowRadius: 12,
+    shadowRadius: 24,
     elevation: 3,
   },
   reportIcon: {
@@ -685,13 +729,13 @@ const styles = StyleSheet.create({
   reportLabel: {
     fontSize: 16,
     fontWeight: "600",
-    color: "#1C1C1E",
+    color: "#1F2937",
     letterSpacing: -0.3,
   },
   reportDate: {
     fontSize: 13,
     fontWeight: "400",
-    color: "#8E8E93",
+    color: "#9CA3AF",
   },
   reportBadge: {
     alignSelf: "flex-start",
@@ -714,7 +758,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: "rgba(255, 59, 48, 0.1)",
+    backgroundColor: "#FEECEC",
     alignItems: "center",
     justifyContent: "center",
   },
