@@ -61,6 +61,8 @@ export default function ReportsScreen() {
   const [success, setSuccess] = useState<string | null>(null);
   const [reports, setReports] = useState<UserReport[]>([]);
   const [loadingReports, setLoadingReports] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchMode, setSearchMode] = useState(false);
 
   // Auto-dismiss success message after 3 seconds
   useEffect(() => {
@@ -95,6 +97,16 @@ export default function ReportsScreen() {
     () => Boolean(userId.trim() && selectedFile?.uri && reportLabel.trim()),
     [userId, selectedFile, reportLabel]
   );
+
+  const filteredReports = useMemo(() => {
+    if (!searchQuery.trim()) return reports;
+    const query = searchQuery.toLowerCase();
+    return reports.filter(
+      (report) =>
+        report.label?.toLowerCase().includes(query) ||
+        report.reportType?.toLowerCase().includes(query)
+    );
+  }, [reports, searchQuery]);
 
   const handlePickFile = async () => {
     setError(null);
@@ -182,16 +194,42 @@ export default function ReportsScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Glassmorphic Header */}
+      {/* Header with Search */}
       <BlurView intensity={80} tint="light" style={styles.header}>
         <View style={styles.headerContent}>
-          <TouchableOpacity style={styles.backButton}>
-            <ChevronLeft size={24} color="#1C1C1E" strokeWidth={2} />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Medical Reports</Text>
-          <TouchableOpacity style={styles.searchButton}>
-            <Search size={20} color="#1C1C1E" strokeWidth={1.5} />
-          </TouchableOpacity>
+          {searchMode ? (
+            <>
+              <TextInput
+                placeholder="Search reports..."
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                style={styles.searchInput}
+                placeholderTextColor="#9CA3AF"
+                autoFocus
+              />
+              <TouchableOpacity
+                style={styles.searchCloseButton}
+                onPress={() => {
+                  setSearchMode(false);
+                  setSearchQuery("");
+                }}
+              >
+                <Text style={styles.searchCloseText}>Cancel</Text>
+              </TouchableOpacity>
+            </>
+          ) : (
+            <>
+              <View style={styles.headerTitleContainer}>
+                <Text style={styles.headerTitle}>Medical Reports</Text>
+              </View>
+              <TouchableOpacity
+                style={styles.searchButton}
+                onPress={() => setSearchMode(true)}
+              >
+                <Search size={20} color="#1F2937" strokeWidth={1.5} />
+              </TouchableOpacity>
+            </>
+          )}
         </View>
       </BlurView>
 
@@ -304,19 +342,23 @@ export default function ReportsScreen() {
 
           {loadingReports ? (
             <View style={styles.loadingContainer}>
-              <ActivityIndicator color="#007AFF" size="large" />
+              <ActivityIndicator color="#1E88E5" size="large" />
             </View>
-          ) : reports.length === 0 ? (
+          ) : filteredReports.length === 0 ? (
             <View style={styles.emptyState}>
               <Activity size={48} color="#C7C7CC" strokeWidth={1.5} />
-              <Text style={styles.emptyText}>No reports yet</Text>
+              <Text style={styles.emptyText}>
+                {searchQuery ? "No matching reports" : "No reports yet"}
+              </Text>
               <Text style={styles.emptySubtext}>
-                Upload your first medical report to get started
+                {searchQuery
+                  ? "Try adjusting your search"
+                  : "Upload your first medical report to get started"}
               </Text>
             </View>
           ) : (
             <FlatList
-              data={reports}
+              data={filteredReports}
               keyExtractor={(item) => item.reportId}
               scrollEnabled={false}
               renderItem={({ item }) => (
@@ -463,6 +505,11 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    gap: 12,
+  },
+  headerTitleContainer: {
+    flex: 1,
+    alignItems: "center",
   },
   headerTitle: {
     fontSize: 20,
@@ -470,13 +517,17 @@ const styles = StyleSheet.create({
     color: "#1F2937",
     letterSpacing: -0.5,
   },
-  backButton: {
-    width: 40,
+  searchInput: {
+    flex: 1,
     height: 40,
+    backgroundColor: "rgba(255, 255, 255, 0.9)",
     borderRadius: 20,
-    backgroundColor: "rgba(46, 196, 182, 0.15)",
-    alignItems: "center",
-    justifyContent: "center",
+    paddingHorizontal: 16,
+    fontSize: 14,
+    fontWeight: "500",
+    color: "#1F2937",
+    borderWidth: 1,
+    borderColor: "rgba(46, 196, 182, 0.2)",
   },
   searchButton: {
     width: 40,
@@ -485,6 +536,14 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(46, 196, 182, 0.15)",
     alignItems: "center",
     justifyContent: "center",
+  },
+  searchCloseButton: {
+    paddingHorizontal: 12,
+  },
+  searchCloseText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#1E88E5",
   },
 
   // Hero Upload Card
