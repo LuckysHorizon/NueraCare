@@ -6,8 +6,6 @@ import {
   Text,
   TouchableOpacity,
   SafeAreaView,
-  Platform,
-  Dimensions,
 } from "react-native";
 import { useSignIn, useOAuth } from "@clerk/clerk-expo";
 import { useRouter, Link } from "expo-router";
@@ -19,8 +17,8 @@ import {
   AuthDivider,
 } from "@/components/auth";
 import { colors, spacing, borderRadius } from "@/theme/colors";
-
-const { width } = Dimensions.get("window");
+import { LinearGradient } from "expo-linear-gradient";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 
 // ========================================
 // SIGN IN SCREEN - Healthcare UI
@@ -120,98 +118,132 @@ export default function SignInScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <ScrollView
-        style={styles.container}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-        bounces={false}
+      <LinearGradient
+        colors={["#F4FFFB", "#E9FDF5"]}
+        style={styles.gradient}
       >
-        {/* HEADER */}
-        <View style={styles.header}>
-          <Text style={styles.logo}>🏥</Text>
-          <Text style={styles.appName}>NueraCare</Text>
-          <Text style={styles.tagline}>Your trusted health companion</Text>
-        </View>
-
-        {/* MAIN FORM CARD */}
-        <GlassCard>
-          {/* HEADING */}
-          <Text style={styles.heading}>Welcome back</Text>
-          <Text style={styles.subheading}>
-            Sign in to continue your health journey
-          </Text>
-
-          {/* ERROR MESSAGE */}
-          {error && (
-            <View
-              style={styles.errorContainer}
-              accessible
-              accessibilityRole="alert"
-              accessibilityLiveRegion="polite"
-            >
-              <Text style={styles.errorIcon}>⚠️</Text>
-              <Text style={styles.errorMessage}>{error}</Text>
+        <ScrollView
+          style={styles.container}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          bounces={false}
+        >
+          {/* BRAND HEADER */}
+          <View style={styles.header}>
+            <View style={styles.logoBadge}>
+              <MaterialCommunityIcons
+                name="heart-plus"
+                size={22}
+                color={colors.white}
+              />
             </View>
-          )}
-
-          {/* EMAIL INPUT */}
-          <AuthInput
-            label="Email Address"
-            placeholder="you@example.com"
-            value={email}
-            onChangeText={setEmail}
-            keyboardType="email-address"
-            editable={!loading && !googleLoading}
-          />
-
-          {/* PASSWORD INPUT */}
-          <AuthInput
-            label="Password"
-            placeholder="••••••••"
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-            editable={!loading && !googleLoading}
-          />
-
-          {/* SIGN IN BUTTON */}
-          <SignInButton
-            title={loading ? "Signing in..." : "Sign In"}
-            onPress={handleEmailSignIn}
-            loading={loading}
-            disabled={googleLoading}
-          />
-
-          {/* DIVIDER */}
-          <AuthDivider />
-
-          {/* GOOGLE SIGN IN */}
-          <GoogleAuthButton
-            title={googleLoading ? "Connecting..." : "Continue with Google"}
-            onPress={handleGoogleSignIn}
-            loading={googleLoading}
-            disabled={loading}
-          />
-
-          {/* SIGN UP LINK */}
-          <View style={styles.signUpContainer}>
-            <Text style={styles.signUpText}>Don't have an account? </Text>
-            <Link href="/(auth)/signup" asChild>
-              <TouchableOpacity accessible accessibilityRole="link">
-                <Text style={styles.signUpLink}>Create one</Text>
-              </TouchableOpacity>
-            </Link>
+            <Text style={styles.appName}>NueraCare</Text>
+            <Text style={styles.tagline}>Your gentle healthcare companion</Text>
           </View>
-        </GlassCard>
 
-        {/* FOOTER REASSURANCE */}
-        <View style={styles.footer}>
-          <Text style={styles.footerIcon}>🔒</Text>
-          <Text style={styles.footerText}>
-            Your data is encrypted and secure
+          {/* MAIN FORM CARD */}
+          <GlassCard style={styles.formCard}>
+            {/* WELCOME TEXT INSIDE CARD */}
+            <View style={styles.cardHeader}>
+              <Text style={styles.heading}>Welcome back</Text>
+              <Text style={styles.subheading}>
+                Sign in to continue your care journey
+              </Text>
+            </View>
+
+            {/* ERROR MESSAGE */}
+            {error && (
+              <View
+                style={styles.errorContainer}
+                accessible
+                accessibilityRole="alert"
+                accessibilityLiveRegion="polite"
+              >
+                <Text style={styles.errorIcon}>⚠️</Text>
+                <Text style={styles.errorMessage}>{error}</Text>
+              </View>
+            )}
+
+            {/* EMAIL INPUT */}
+            <View style={styles.inputLabelRow}>
+              <MaterialCommunityIcons
+                name="email-outline"
+                size={18}
+                color={colors.gray600}
+              />
+              <Text style={styles.inputLabelText}>Email</Text>
+            </View>
+            <AuthInput
+              placeholder="Enter your email"
+              value={email}
+              onChangeText={setEmail}
+              keyboardType="email-address"
+              editable={!loading && !googleLoading}
+            />
+
+            {/* PASSWORD INPUT */}
+            <View style={styles.inputLabelRow}>
+              <MaterialCommunityIcons
+                name="lock-outline"
+                size={18}
+                color={colors.gray600}
+              />
+              <Text style={styles.inputLabelText}>Password</Text>
+            </View>
+            <AuthInput
+              placeholder="Enter your password"
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry
+              editable={!loading && !googleLoading}
+            />
+
+            {/* FORGOT PASSWORD */}
+            <View style={styles.forgotContainer}>
+              <Link href="/(auth)/otp" asChild>
+                <TouchableOpacity accessible accessibilityRole="link">
+                  <Text style={styles.forgotText}>Forgot password?</Text>
+                </TouchableOpacity>
+              </Link>
+            </View>
+
+            {/* SIGN IN BUTTON */}
+            <SignInButton
+              title={loading ? "Signing in..." : "Sign In"}
+              onPress={handleEmailSignIn}
+              loading={loading}
+              disabled={googleLoading}
+            />
+
+            {/* DIVIDER */}
+            <AuthDivider />
+
+            {/* GOOGLE SIGN IN */}
+            <GoogleAuthButton
+              title={googleLoading ? "Connecting..." : "Continue with Google"}
+              onPress={handleGoogleSignIn}
+              loading={googleLoading}
+              disabled={loading}
+            />
+
+            {/* SIGNUP LINK */}
+            <View style={styles.signupContainer}>
+              <Text style={styles.signupText}>Don't have an account? </Text>
+              <Link href="/(auth)/signup" asChild>
+                <TouchableOpacity accessible accessibilityRole="link">
+                  <Text style={styles.signupLink}>Sign up</Text>
+                </TouchableOpacity>
+              </Link>
+            </View>
+          </GlassCard>
+
+          {/* TERMS NOTICE */}
+          <Text style={styles.termsText}>
+            By continuing, you agree to NueraCare’s{" "}
+            <Text style={styles.termsLink}>Terms & Privacy Policy</Text>
           </Text>
-        </View>
-      </ScrollView>
+        </ScrollView>
+      </LinearGradient>
     </SafeAreaView>
   );
 }
@@ -222,15 +254,18 @@ export default function SignInScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: colors.gray50,
+    backgroundColor: "#F4FFFB",
+  },
+  gradient: {
+    flex: 1,
   },
   container: {
     flex: 1,
-    backgroundColor: colors.gray50,
+    backgroundColor: "transparent",
   },
   scrollContent: {
     paddingHorizontal: spacing.lg,
-    paddingTop: spacing.xl,
+    paddingTop: spacing.xxl,
     paddingBottom: spacing.xxxl,
   },
 
@@ -239,22 +274,48 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: spacing.xxxl,
   },
-  logo: {
-    fontSize: 56,
+  logoBadge: {
+    width: 52,
+    height: 52,
+    borderRadius: borderRadius.full,
+    backgroundColor: "#16C79A",
+    alignItems: "center",
+    justifyContent: "center",
     marginBottom: spacing.md,
+    shadowColor: "#16C79A",
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 3,
   },
   appName: {
-    fontSize: 28,
-    fontWeight: "700",
+    fontSize: 36,
+    fontWeight: "800",
     color: colors.gray900,
-    marginBottom: spacing.xs,
+    marginBottom: spacing.sm,
     letterSpacing: 0.5,
   },
   tagline: {
-    fontSize: 14,
-    color: colors.gray500,
-    fontWeight: "500",
-    letterSpacing: 0.3,
+    fontSize: 13,
+    color: colors.gray600,
+    fontWeight: "400",
+    letterSpacing: 0.2,
+  },
+
+  // WELCOME BLOCK
+  welcomeBlock: {
+    alignItems: "center",
+    marginBottom: spacing.xxl,
+    paddingHorizontal: spacing.lg,
+  },
+
+  // CARD HEADER
+  cardHeader: {
+    alignItems: "center",
+    marginBottom: spacing.lg,
+    paddingBottom: spacing.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(16, 185, 129, 0.1)",
   },
 
   // ERROR
@@ -284,57 +345,88 @@ const styles = StyleSheet.create({
 
   // HEADING
   heading: {
-    fontSize: 28,
-    fontWeight: "700",
+    fontSize: 24,
+    fontWeight: "600",
     color: colors.gray900,
-    marginBottom: spacing.xs,
-    letterSpacing: 0.4,
+    marginBottom: spacing.md,
+    letterSpacing: 0.2,
+    textAlign: "center",
   },
   subheading: {
-    fontSize: 14,
+    fontSize: 13,
     color: colors.gray600,
-    marginBottom: spacing.xl,
-    fontWeight: "500",
+    fontWeight: "400",
     lineHeight: 20,
+    textAlign: "center",
   },
 
-  // SIGN UP LINK
-  signUpContainer: {
+  // FORM CARD
+  formCard: {
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.lg,
+    marginBottom: spacing.xl,
+  },
+
+  // INPUT LABEL ROW
+  inputLabelRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    marginBottom: spacing.sm,
+    marginTop: spacing.md,
+  },
+  inputLabelText: {
+    fontSize: 14,
+    color: colors.gray700,
+    fontWeight: "600",
+    letterSpacing: 0.2,
+  },
+
+  // FORGOT PASSWORD
+  forgotContainer: {
+    alignItems: "flex-end",
+    marginTop: -spacing.sm,
+    marginBottom: spacing.md,
+  },
+  forgotText: {
+    color: "#0F9D7A",
+    fontSize: 13,
+    fontWeight: "600",
+  },
+
+  // TERMS NOTICE
+  termsText: {
+    marginTop: spacing.xl,
+    fontSize: 12,
+    color: colors.gray600,
+    textAlign: "center",
+    opacity: 0.7,
+    paddingHorizontal: spacing.lg,
+    lineHeight: 18,
+  },
+  termsLink: {
+    color: "#0F9D7A",
+    fontWeight: "600",
+  },
+
+  // SIGNUP CONTAINER
+  signupContainer: {
     flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
-    marginTop: spacing.xl,
+    marginTop: spacing.lg,
     paddingTop: spacing.lg,
     borderTopWidth: 1,
-    borderTopColor: "rgba(0, 0, 0, 0.05)",
+    borderTopColor: "rgba(16, 185, 129, 0.1)",
   },
-  signUpText: {
-    fontSize: 14,
-    color: colors.gray600,
-    fontWeight: "500",
-  },
-  signUpLink: {
-    fontSize: 14,
-    color: colors.primary,
-    fontWeight: "700",
-    letterSpacing: 0.3,
-  },
-
-  // FOOTER
-  footer: {
-    alignItems: "center",
-    marginTop: spacing.xxl,
-    paddingHorizontal: spacing.md,
-  },
-  footerIcon: {
-    fontSize: 20,
-    marginBottom: spacing.sm,
-  },
-  footerText: {
+  signupText: {
     fontSize: 13,
-    color: colors.gray500,
-    textAlign: "center",
-    fontWeight: "500",
-    lineHeight: 18,
+    color: colors.gray600,
+    fontWeight: "400",
+  },
+  signupLink: {
+    fontSize: 13,
+    color: "#16C79A",
+    fontWeight: "600",
   },
 });

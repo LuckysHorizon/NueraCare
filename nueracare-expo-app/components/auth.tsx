@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import { colors, spacing, borderRadius } from "@/theme/colors";
 import { BlurView } from "expo-blur";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 
 // ========================================
 // GLASS CARD - Premium glassmorphism
@@ -156,7 +157,7 @@ export function GoogleAuthButton({
         <ActivityIndicator color={colors.gray800} size="small" />
       ) : (
         <>
-          <Text style={styles.googleIcon}>🔐</Text>
+          <MaterialCommunityIcons name="google" size={20} color="#DB4437" />
           <Text style={styles.googleButtonText}>{title}</Text>
         </>
       )}
@@ -183,11 +184,11 @@ export function AuthDivider({ text = "or continue with" }) {
 const styles = StyleSheet.create({
   // GLASS CARD
   glassCard: {
-    borderRadius: 20,
+    borderRadius: 24,
     overflow: "hidden",
-    backgroundColor: "rgba(255, 255, 255, 0.70)",
+    backgroundColor: "rgba(255, 255, 255, 0.75)",
     borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.85)",
+    borderColor: "rgba(255, 255, 255, 0.9)",
     shadowColor: "#000",
     shadowOpacity: 0.08,
     shadowRadius: 16,
@@ -210,7 +211,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.2,
   },
   authInput: {
-    borderRadius: borderRadius.lg,
+    borderRadius: 18,
     borderWidth: 1,
     borderColor: colors.gray200,
     paddingHorizontal: spacing.md,
@@ -244,13 +245,13 @@ const styles = StyleSheet.create({
 
   // SIGN IN BUTTON
   signInButton: {
-    backgroundColor: colors.primary,
-    borderRadius: borderRadius.lg,
+    backgroundColor: "#16C79A",
+    borderRadius: 28,
     minHeight: 56,
     justifyContent: "center",
     alignItems: "center",
     marginTop: spacing.md,
-    shadowColor: colors.primary,
+    shadowColor: "#16C79A",
     shadowOpacity: 0.25,
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 6 },
@@ -265,23 +266,20 @@ const styles = StyleSheet.create({
 
   // GOOGLE BUTTON
   googleButton: {
-    borderRadius: borderRadius.lg,
+    borderRadius: 28,
     borderWidth: 1.5,
     borderColor: colors.gray300,
-    minHeight: 52,
+    minHeight: 56,
     justifyContent: "center",
     alignItems: "center",
     flexDirection: "row",
+    gap: spacing.sm,
     backgroundColor: colors.white,
     shadowColor: "#000",
     shadowOpacity: 0.06,
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 2 },
     elevation: 1,
-  },
-  googleIcon: {
-    fontSize: 20,
-    marginRight: spacing.sm,
   },
   googleButtonText: {
     color: colors.gray800,
